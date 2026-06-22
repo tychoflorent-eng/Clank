@@ -30,9 +30,9 @@ npm install
 cp server/.env.example server/.env
 # Edit server/.env and set API_NINJAS_KEY (free signup at https://api-ninjas.com/api/motorcycles)
 # Model search returns empty results without a key; everything else still works.
-
-npm run db:migrate
 ```
+
+The database schema is migrated automatically on every server start — no manual migration step needed.
 
 ## Development
 
@@ -59,7 +59,35 @@ browser. Open port 4000 in the host's firewall if needed.
 
 To change the port, set `PORT` in `server/.env`.
 
+## Run with Docker
+
+The quickest way to get a shop machine running: a single container with the API, built UI, and
+SQLite database, with the schema migrated automatically on startup.
+
+```bash
+# Optional: set your API Ninjas key for model search
+export API_NINJAS_KEY=your-key-here
+
+docker compose up -d --build
+```
+
+Open `http://<that machine's LAN IP>:4000` from any browser on the network. Data (SQLite database
+and uploaded diagrams) persists in the `clank-data` Docker volume across restarts/rebuilds.
+
+To set the API key permanently, create a `.env` file next to `docker-compose.yml`:
+
+```
+API_NINJAS_KEY=your-key-here
+```
+
+Update and restart after pulling changes:
+
+```bash
+docker compose up -d --build
+```
+
 ## Data storage
 
-- SQLite database and uploaded diagram files live under `data/` (gitignored). Back this directory
-  up if you care about the maintenance history and uploaded manuals.
+- SQLite database and uploaded diagram files live under `data/` (gitignored) when running directly
+  with Node, or in the `clank-data` Docker volume when running via Compose. Back this up if you
+  care about the maintenance history and uploaded manuals.

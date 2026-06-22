@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "node:path";
 import fs from "node:fs";
 import * as schema from "./schema.js";
@@ -13,5 +14,10 @@ sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 
 export const db = drizzle(sqlite, { schema });
+
+// Applied on every boot so a fresh container/checkout never needs a manual
+// migrate step; drizzle tracks what's already applied and no-ops the rest.
+migrate(db, { migrationsFolder: path.join(import.meta.dirname, "migrations") });
+
 export const diagramsDir = path.join(dataDir, "diagrams");
 fs.mkdirSync(diagramsDir, { recursive: true });
