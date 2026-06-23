@@ -6,6 +6,8 @@ every mechanic on the LAN reaches it from a browser — nothing to install per p
 Scope for now: motorcycles only, Linux/Windows server, browser clients. Cars and a native mobile
 app are deliberately out of scope until this is solid.
 
+![Garage view](docs/screenshot-garage.png)
+
 ## Features
 
 - **Garage** — track the motorcycles you own/service (make, model, year, VIN, mileage, notes)
