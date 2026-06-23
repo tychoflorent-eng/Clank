@@ -37,10 +37,11 @@ Requirements: Docker Desktop (Windows) or Docker Engine + Compose plugin (Linux)
    cd clank
    ```
 
-3. **(Optional) Set your API key** — needed for model search lookups; everything else works without it. Get a free key at https://api-ninjas.com/api/motorcycles, then create a `.env` file in the project root:
+3. **(Optional) Set your API key** — this powers model search lookups; everything else works fine without it, and you can always add it later. If you want it now: sign up for a free key at https://api-ninjas.com/api/motorcycles, then make a copy of the example settings file and open it in a plain text editor (Notepad on Windows, gedit/nano on Linux):
+   ```bash
+   cp .env.example .env
    ```
-   API_NINJAS_KEY=your-key-here
-   ```
+   Open the new `.env` file, find the line `API_NINJAS_KEY=`, and type your key right after the `=` (no quotes, no spaces). Save and close.
 
 4. **Start the app**
    ```bash
@@ -74,12 +75,13 @@ Requirements: Node.js 20+, git
    npm install
    ```
 
-3. **(Optional) Set your API key**
+3. **(Optional) Set your API key** — powers model search; everything else works without it, and you can add it later.
    ```bash
    cp server/.env.example server/.env
-   # Edit server/.env and set API_NINJAS_KEY (free signup at https://api-ninjas.com/api/motorcycles)
-   # Model search returns empty results without a key; everything else still works.
    ```
+   Open `server/.env` in a plain text editor (Notepad on Windows, gedit/nano on Linux), find the
+   line `API_NINJAS_KEY=`, and type your key (free signup at https://api-ninjas.com/api/motorcycles)
+   right after the `=`. Save and close.
 
 4. **Build and start**
    ```bash
