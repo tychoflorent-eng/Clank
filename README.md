@@ -19,20 +19,80 @@ app are deliberately out of scope until this is solid.
 - `client/` — React + TypeScript + Vite SPA
 - In production the server serves the built client too, so the whole app is one process on one port
 
-## Setup
+## Installation
 
-Requires Node.js 20+.
+Two ways to run it — Docker is the easiest for most shops.
 
-```bash
-npm install
+### Option A: Docker (recommended)
 
-# Server config
-cp server/.env.example server/.env
-# Edit server/.env and set API_NINJAS_KEY (free signup at https://api-ninjas.com/api/motorcycles)
-# Model search returns empty results without a key; everything else still works.
-```
+Requirements: Docker Desktop (Windows) or Docker Engine + Compose plugin (Linux)
 
-The database schema is migrated automatically on every server start — no manual migration step needed.
+1. **Install Docker**
+   - Windows: download Docker Desktop from docker.com, install, enable the WSL2 backend if prompted, restart your machine.
+   - Linux: install via your package manager, or run the official convenience script: `curl -fsSL https://get.docker.com | sh`
+
+2. **Get the code**
+   ```bash
+   git clone https://github.com/tychoflorent-eng/clank.git
+   cd clank
+   ```
+
+3. **(Optional) Set your API key** — needed for model search lookups; everything else works without it. Get a free key at https://api-ninjas.com/api/motorcycles, then create a `.env` file in the project root:
+   ```
+   API_NINJAS_KEY=your-key-here
+   ```
+
+4. **Start the app**
+   ```bash
+   docker compose up -d --build
+   ```
+   First run takes a minute or two to build the image.
+
+5. **Open it**
+   - On the server itself: http://localhost:4000
+   - From any other device on the network: `http://<server's-LAN-IP>:4000` (find the IP with `ip addr` on Linux or `ipconfig` on Windows)
+
+6. **Allow it through the firewall** if other devices can't reach it — open port 4000 on the host.
+
+The database schema migrates itself automatically on startup. Data (database + uploaded diagrams) persists in the `clank-data` Docker volume across restarts/rebuilds.
+
+- **Update:** `git pull` then `docker compose up -d --build` again.
+- **Stop:** `docker compose down` (add `-v` only if you want to wipe stored data too).
+
+### Option B: Manual install (no Docker)
+
+Requirements: Node.js 20+, git
+
+1. **Install Node.js 20+**
+   - Windows: installer from nodejs.org
+   - Linux: via your package manager or nvm
+
+2. **Get the code and install dependencies**
+   ```bash
+   git clone https://github.com/tychoflorent-eng/clank.git
+   cd clank
+   npm install
+   ```
+
+3. **(Optional) Set your API key**
+   ```bash
+   cp server/.env.example server/.env
+   # Edit server/.env and set API_NINJAS_KEY (free signup at https://api-ninjas.com/api/motorcycles)
+   # Model search returns empty results without a key; everything else still works.
+   ```
+
+4. **Build and start**
+   ```bash
+   npm run build
+   npm start
+   ```
+
+The server binds `0.0.0.0:4000` and serves both the API and the built UI, with the database
+schema migrated automatically on startup. Find this machine's LAN IP (`ip addr` / `ipconfig`)
+and have other mechanics open `http://<that-ip>:4000` in their browser. Open port 4000 in the
+host's firewall if needed. To change the port, set `PORT` in `server/.env`.
+
+- **Update:** `git pull`, `npm install`, `npm run build`, then restart `npm start`.
 
 ## Development
 
@@ -43,48 +103,6 @@ npm run dev
 ```
 
 Open http://localhost:5173
-
-## Production (LAN-hosted)
-
-Build the client and start the single server process:
-
-```bash
-npm run build
-npm start
-```
-
-The server binds `0.0.0.0:4000` and serves both the API and the built UI. Find this machine's
-LAN IP (`ip addr` / `ipconfig`) and have other mechanics open `http://<that-ip>:4000` in their
-browser. Open port 4000 in the host's firewall if needed.
-
-To change the port, set `PORT` in `server/.env`.
-
-## Run with Docker
-
-The quickest way to get a shop machine running: a single container with the API, built UI, and
-SQLite database, with the schema migrated automatically on startup.
-
-```bash
-# Optional: set your API Ninjas key for model search
-export API_NINJAS_KEY=your-key-here
-
-docker compose up -d --build
-```
-
-Open `http://<that machine's LAN IP>:4000` from any browser on the network. Data (SQLite database
-and uploaded diagrams) persists in the `clank-data` Docker volume across restarts/rebuilds.
-
-To set the API key permanently, create a `.env` file next to `docker-compose.yml`:
-
-```
-API_NINJAS_KEY=your-key-here
-```
-
-Update and restart after pulling changes:
-
-```bash
-docker compose up -d --build
-```
 
 ## Data storage
 
