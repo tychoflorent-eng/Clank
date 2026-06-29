@@ -26,13 +26,22 @@ export default function GarageScreen() {
           <ThemedText type="title" style={styles.title}>
             Garage
           </ThemedText>
-          <Pressable
-            onPress={() => router.push('/motorcycle/new')}
-            style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedView type="backgroundElement" style={styles.addButton}>
-              <ThemedText type="smallBold">Add</ThemedText>
-            </ThemedView>
-          </Pressable>
+          <ThemedView style={styles.headerActions}>
+            <Pressable
+              onPress={() => router.push('/motorcycle/import')}
+              style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type="backgroundElement" style={styles.addButton}>
+                <ThemedText type="smallBold">Import</ThemedText>
+              </ThemedView>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/motorcycle/new')}
+              style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type="backgroundElement" style={styles.addButton}>
+                <ThemedText type="smallBold">Add</ThemedText>
+              </ThemedView>
+            </Pressable>
+          </ThemedView>
         </ThemedView>
 
         <FlatList
@@ -81,6 +90,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   title: { fontSize: 32, lineHeight: 40 },
+  headerActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
   addButton: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
