@@ -10,33 +10,33 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
-import { maintenanceRecords, motorcycles, ownershipEvents } from '@/db/schema';
+import { maintenanceRecords, ownershipEvents, vehicles } from '@/db/schema';
 import { buildTransferBundle, writeTransferFile } from '@/lib/transfer';
 
-export default function MotorcycleDetailScreen() {
+export default function VehicleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const motorcycleId = Number(id);
+  const vehicleId = Number(id);
 
-  const { data: bikes } = useLiveQuery(
-    db.select().from(motorcycles).where(eq(motorcycles.id, motorcycleId)),
-    [motorcycleId],
+  const { data: vehicleRows } = useLiveQuery(
+    db.select().from(vehicles).where(eq(vehicles.id, vehicleId)),
+    [vehicleId],
   );
-  const bike = bikes[0];
+  const vehicle = vehicleRows[0];
 
   const { data: records } = useLiveQuery(
     db
       .select()
       .from(maintenanceRecords)
-      .where(eq(maintenanceRecords.motorcycleId, motorcycleId))
+      .where(eq(maintenanceRecords.vehicleId, vehicleId))
       .orderBy(desc(maintenanceRecords.date)),
-    [motorcycleId],
+    [vehicleId],
   );
 
-  if (!bike) {
+  if (!vehicle) {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
-          <ThemedText themeColor="textSecondary">Motorcycle not found.</ThemedText>
+          <ThemedText themeColor="textSecondary">Vehicle not found.</ThemedText>
         </SafeAreaView>
       </ThemedView>
     );
@@ -44,17 +44,17 @@ export default function MotorcycleDetailScreen() {
 
   const handleTransferOut = () => {
     const now = new Date().toISOString();
-    db.update(motorcycles)
+    db.update(vehicles)
       .set({ status: 'archived', archivedAt: now, updatedAt: now })
-      .where(eq(motorcycles.id, motorcycleId))
+      .where(eq(vehicles.id, vehicleId))
       .run();
-    db.insert(ownershipEvents).values({ motorcycleId, type: 'transferred_out' }).run();
+    db.insert(ownershipEvents).values({ vehicleId, type: 'transferred_out' }).run();
     router.back();
   };
 
   const handleShare = async () => {
     try {
-      const bundle = buildTransferBundle(motorcycleId);
+      const bundle = buildTransferBundle(vehicleId);
       const file = writeTransferFile(bundle);
       if (!(await Sharing.isAvailableAsync())) {
         Alert.alert('Sharing unavailable', 'This device cannot share files.');
@@ -71,29 +71,40 @@ export default function MotorcycleDetailScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen options={{ title: bike.nickname || `${bike.make} ${bike.model}` }} />
+      <Stack.Screen options={{ title: vehicle.nickname || `${vehicle.make} ${vehicle.model}` }} />
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <ThemedView style={styles.infoCard}>
-            <ThemedText type="title" style={styles.bikeTitle}>
-              {bike.nickname || `${bike.make} ${bike.model}`}
-            </ThemedText>
+            <ThemedView style={styles.titleRow}>
+              <ThemedText type="title" style={styles.vehicleTitle}>
+                {vehicle.nickname || `${vehicle.make} ${vehicle.model}`}
+              </ThemedText>
+              <ThemedView type="backgroundElement" style={styles.typeBadge}>
+                <ThemedText type="small">
+                  {vehicle.type === 'car' ? 'Car' : 'Motorcycle'}
+                </ThemedText>
+              </ThemedView>
+            </ThemedView>
             <ThemedText themeColor="textSecondary">
-              {bike.year} {bike.make} {bike.model}
+              {vehicle.year} {vehicle.make} {vehicle.model}
             </ThemedText>
-            {bike.mileage != null && (
+            {vehicle.mileage != null && (
               <ThemedText themeColor="textSecondary">
-                {bike.mileage.toLocaleString()} mi
+                {vehicle.mileage.toLocaleString()} mi
               </ThemedText>
             )}
-            {bike.vin && <ThemedText themeColor="textSecondary">VIN: {bike.vin}</ThemedText>}
-            {bike.plate && <ThemedText themeColor="textSecondary">Plate: {bike.plate}</ThemedText>}
-            {bike.color && <ThemedText themeColor="textSecondary">Color: {bike.color}</ThemedText>}
-            {bike.notes && <ThemedText themeColor="textSecondary">{bike.notes}</ThemedText>}
+            {vehicle.vin && <ThemedText themeColor="textSecondary">VIN: {vehicle.vin}</ThemedText>}
+            {vehicle.plate && (
+              <ThemedText themeColor="textSecondary">Plate: {vehicle.plate}</ThemedText>
+            )}
+            {vehicle.color && (
+              <ThemedText themeColor="textSecondary">Color: {vehicle.color}</ThemedText>
+            )}
+            {vehicle.notes && <ThemedText themeColor="textSecondary">{vehicle.notes}</ThemedText>}
 
             <ThemedView style={styles.actionsRow}>
               <Pressable
-                onPress={() => router.push(`/motorcycle/${motorcycleId}/edit`)}
+                onPress={() => router.push(`/vehicle/${vehicleId}/edit`)}
                 style={({ pressed }) => pressed && styles.pressed}>
                 <ThemedView type="backgroundSelected" style={styles.actionButton}>
                   <ThemedText type="smallBold">Edit</ThemedText>
@@ -108,7 +119,7 @@ export default function MotorcycleDetailScreen() {
                 onPress={handleTransferOut}
                 style={({ pressed }) => pressed && styles.pressed}>
                 <ThemedView type="backgroundElement" style={styles.actionButton}>
-                  <ThemedText type="smallBold">No longer own this bike</ThemedText>
+                  <ThemedText type="smallBold">No longer own this vehicle</ThemedText>
                 </ThemedView>
               </Pressable>
             </ThemedView>
@@ -120,7 +131,7 @@ export default function MotorcycleDetailScreen() {
                 Maintenance log
               </ThemedText>
               <Pressable
-                onPress={() => router.push(`/motorcycle/${motorcycleId}/maintenance/new`)}
+                onPress={() => router.push(`/vehicle/${vehicleId}/maintenance/new`)}
                 style={({ pressed }) => pressed && styles.pressed}>
                 <ThemedView type="backgroundElement" style={styles.addButton}>
                   <ThemedText type="smallBold">Add</ThemedText>
@@ -137,9 +148,13 @@ export default function MotorcycleDetailScreen() {
                 <ThemedText type="smallBold">{record.type}</ThemedText>
                 <ThemedText themeColor="textSecondary">
                   {record.date}
+                  {record.time ? ` ${record.time}` : ''}
                   {record.mileage != null ? ` · ${record.mileage.toLocaleString()} mi` : ''}
                   {record.cost != null ? ` · $${record.cost.toFixed(2)}` : ''}
                 </ThemedText>
+                {record.partNumber && (
+                  <ThemedText themeColor="textSecondary">Part #: {record.partNumber}</ThemedText>
+                )}
                 {record.description && (
                   <ThemedText themeColor="textSecondary">{record.description}</ThemedText>
                 )}
@@ -161,7 +176,17 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
   },
   infoCard: { gap: Spacing.one },
-  bikeTitle: { fontSize: 28, lineHeight: 34 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  vehicleTitle: { fontSize: 28, lineHeight: 34 },
+  typeBadge: {
+    paddingVertical: Spacing.half,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Spacing.two,
+  },
   actionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

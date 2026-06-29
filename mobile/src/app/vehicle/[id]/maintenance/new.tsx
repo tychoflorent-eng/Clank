@@ -20,12 +20,18 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function nowTime() {
+  return new Date().toTimeString().slice(0, 5);
+}
+
 export default function NewMaintenanceRecordScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const motorcycleId = Number(id);
+  const vehicleId = Number(id);
 
   const [date, setDate] = useState(todayIso());
+  const [time, setTime] = useState(nowTime());
   const [type, setType] = useState('');
+  const [partNumber, setPartNumber] = useState('');
   const [mileage, setMileage] = useState('');
   const [cost, setCost] = useState('');
   const [performedBy, setPerformedBy] = useState('');
@@ -52,9 +58,11 @@ export default function NewMaintenanceRecordScreen() {
 
     db.insert(maintenanceRecords)
       .values({
-        motorcycleId,
+        vehicleId,
         date: date.trim(),
+        time: emptyToUndefined(time),
         type: type.trim(),
+        partNumber: emptyToUndefined(partNumber),
         mileage: parsedMileage,
         cost: parsedCost,
         performedBy: emptyToUndefined(performedBy),
@@ -67,7 +75,7 @@ export default function NewMaintenanceRecordScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen options={{ title: 'Add maintenance record' }} />
+      <Stack.Screen options={{ title: 'Add repair / maintenance' }} />
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.form}>
           <FormField
@@ -76,11 +84,18 @@ export default function NewMaintenanceRecordScreen() {
             onChangeText={setDate}
             placeholder="YYYY-MM-DD"
           />
+          <FormField label="Time" value={time} onChangeText={setTime} placeholder="HH:MM" />
           <FormField
             label="Type"
             value={type}
             onChangeText={setType}
-            placeholder="Oil change"
+            placeholder="Oil change, repair, etc."
+          />
+          <FormField
+            label="Part number"
+            value={partNumber}
+            onChangeText={setPartNumber}
+            placeholder="Optional"
           />
           <FormField
             label="Mileage"

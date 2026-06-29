@@ -9,11 +9,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
-import { maintenanceRecords, motorcycles, ownershipEvents } from '@/db/schema';
-import { type MotorcycleTransferBundle, parseTransferBundle } from '@/lib/transfer';
+import { maintenanceRecords, ownershipEvents, vehicles } from '@/db/schema';
+import { parseTransferBundle, type VehicleTransferBundle } from '@/lib/transfer';
 
-export default function ImportMotorcycleScreen() {
-  const [bundle, setBundle] = useState<MotorcycleTransferBundle | null>(null);
+export default function ImportVehicleScreen() {
+  const [bundle, setBundle] = useState<VehicleTransferBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleChooseFile = async () => {
@@ -32,52 +32,53 @@ export default function ImportMotorcycleScreen() {
   const handleImport = () => {
     if (!bundle) return;
 
-    const bike = db.transaction((tx) => {
+    const vehicle = db.transaction((tx) => {
       const inserted = tx
-        .insert(motorcycles)
+        .insert(vehicles)
         .values({
-          make: bundle.motorcycle.make,
-          model: bundle.motorcycle.model,
-          year: bundle.motorcycle.year,
-          nickname: bundle.motorcycle.nickname,
-          vin: bundle.motorcycle.vin,
-          plate: bundle.motorcycle.plate,
-          color: bundle.motorcycle.color,
-          mileage: bundle.motorcycle.mileage,
-          notes: bundle.motorcycle.notes,
-          createdAt: bundle.motorcycle.createdAt,
+          type: bundle.vehicle.type,
+          make: bundle.vehicle.make,
+          model: bundle.vehicle.model,
+          year: bundle.vehicle.year,
+          nickname: bundle.vehicle.nickname,
+          vin: bundle.vehicle.vin,
+          plate: bundle.vehicle.plate,
+          color: bundle.vehicle.color,
+          mileage: bundle.vehicle.mileage,
+          notes: bundle.vehicle.notes,
+          createdAt: bundle.vehicle.createdAt,
         })
         .returning()
         .get();
 
       for (const record of bundle.maintenanceRecords) {
         tx.insert(maintenanceRecords)
-          .values({ motorcycleId: inserted.id, ...record })
+          .values({ vehicleId: inserted.id, ...record })
           .run();
       }
 
       for (const event of bundle.ownershipEvents) {
         tx.insert(ownershipEvents)
-          .values({ motorcycleId: inserted.id, ...event })
+          .values({ vehicleId: inserted.id, ...event })
           .run();
       }
 
-      tx.insert(ownershipEvents).values({ motorcycleId: inserted.id, type: 'imported' }).run();
+      tx.insert(ownershipEvents).values({ vehicleId: inserted.id, type: 'imported' }).run();
 
       return inserted;
     });
 
-    router.replace(`/motorcycle/${bike.id}`);
+    router.replace(`/vehicle/${vehicle.id}`);
   };
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen options={{ title: 'Import motorcycle' }} />
+      <Stack.Screen options={{ title: 'Import vehicle' }} />
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <ThemedText themeColor="textSecondary">
-            Choose a maintenance history file someone shared with you to add their bike to your
-            garage with its full history.
+            Choose a maintenance history file someone shared with you to add their vehicle to
+            your garage with its full history.
           </ThemedText>
 
           <Pressable onPress={handleChooseFile} style={({ pressed }) => pressed && styles.pressed}>
@@ -91,10 +92,10 @@ export default function ImportMotorcycleScreen() {
           {bundle && (
             <ThemedView type="backgroundElement" style={styles.previewCard}>
               <ThemedText type="smallBold">
-                {bundle.motorcycle.nickname || `${bundle.motorcycle.make} ${bundle.motorcycle.model}`}
+                {bundle.vehicle.nickname || `${bundle.vehicle.make} ${bundle.vehicle.model}`}
               </ThemedText>
               <ThemedText themeColor="textSecondary">
-                {bundle.motorcycle.year} {bundle.motorcycle.make} {bundle.motorcycle.model}
+                {bundle.vehicle.year} {bundle.vehicle.make} {bundle.vehicle.model}
               </ThemedText>
               <ThemedText themeColor="textSecondary">
                 {bundle.maintenanceRecords.length} maintenance record

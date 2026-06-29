@@ -2,14 +2,15 @@ import { eq } from 'drizzle-orm';
 import { File, Paths } from 'expo-file-system';
 
 import { db } from '@/db/client';
-import { maintenanceRecords, motorcycles, ownershipEvents } from '@/db/schema';
+import { maintenanceRecords, ownershipEvents, vehicles } from '@/db/schema';
 
-export const TRANSFER_SCHEMA_VERSION = 1;
+export const TRANSFER_SCHEMA_VERSION = 2;
 
-export type MotorcycleTransferBundle = {
+export type VehicleTransferBundle = {
   schemaVersion: number;
   exportedAt: string;
-  motorcycle: {
+  vehicle: {
+    type: 'motorcycle' | 'car';
     make: string;
     model: string;
     year: number;
@@ -23,8 +24,10 @@ export type MotorcycleTransferBundle = {
   };
   maintenanceRecords: {
     date: string;
+    time: string | null;
     mileage: number | null;
     type: string;
+    partNumber: string | null;
     description: string | null;
     performedBy: string | null;
     cost: number | null;
@@ -37,43 +40,46 @@ export type MotorcycleTransferBundle = {
   }[];
 };
 
-export function buildTransferBundle(motorcycleId: number): MotorcycleTransferBundle {
-  const bike = db.select().from(motorcycles).where(eq(motorcycles.id, motorcycleId)).get();
-  if (!bike) {
-    throw new Error('Motorcycle not found.');
+export function buildTransferBundle(vehicleId: number): VehicleTransferBundle {
+  const vehicle = db.select().from(vehicles).where(eq(vehicles.id, vehicleId)).get();
+  if (!vehicle) {
+    throw new Error('Vehicle not found.');
   }
 
   const records = db
     .select()
     .from(maintenanceRecords)
-    .where(eq(maintenanceRecords.motorcycleId, motorcycleId))
+    .where(eq(maintenanceRecords.vehicleId, vehicleId))
     .all();
 
   const events = db
     .select()
     .from(ownershipEvents)
-    .where(eq(ownershipEvents.motorcycleId, motorcycleId))
+    .where(eq(ownershipEvents.vehicleId, vehicleId))
     .all();
 
   return {
     schemaVersion: TRANSFER_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
-    motorcycle: {
-      make: bike.make,
-      model: bike.model,
-      year: bike.year,
-      nickname: bike.nickname,
-      vin: bike.vin,
-      plate: bike.plate,
-      color: bike.color,
-      mileage: bike.mileage,
-      notes: bike.notes,
-      createdAt: bike.createdAt,
+    vehicle: {
+      type: vehicle.type,
+      make: vehicle.make,
+      model: vehicle.model,
+      year: vehicle.year,
+      nickname: vehicle.nickname,
+      vin: vehicle.vin,
+      plate: vehicle.plate,
+      color: vehicle.color,
+      mileage: vehicle.mileage,
+      notes: vehicle.notes,
+      createdAt: vehicle.createdAt,
     },
     maintenanceRecords: records.map((record) => ({
       date: record.date,
+      time: record.time,
       mileage: record.mileage,
       type: record.type,
+      partNumber: record.partNumber,
       description: record.description,
       performedBy: record.performedBy,
       cost: record.cost,
@@ -87,16 +93,16 @@ export function buildTransferBundle(motorcycleId: number): MotorcycleTransferBun
   };
 }
 
-function slugFor(bike: MotorcycleTransferBundle['motorcycle']) {
-  const base = (bike.nickname || `${bike.make}-${bike.model}`)
+function slugFor(vehicle: VehicleTransferBundle['vehicle']) {
+  const base = (vehicle.nickname || `${vehicle.make}-${vehicle.model}`)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return base || 'motorcycle';
+  return base || 'vehicle';
 }
 
-export function writeTransferFile(bundle: MotorcycleTransferBundle): File {
-  const file = new File(Paths.cache, `${slugFor(bundle.motorcycle)}.clank.json`);
+export function writeTransferFile(bundle: VehicleTransferBundle): File {
+  const file = new File(Paths.cache, `${slugFor(bundle.vehicle)}.clank.json`);
   if (file.exists) {
     file.delete();
   }
@@ -105,17 +111,17 @@ export function writeTransferFile(bundle: MotorcycleTransferBundle): File {
   return file;
 }
 
-export function parseTransferBundle(contents: string): MotorcycleTransferBundle {
+export function parseTransferBundle(contents: string): VehicleTransferBundle {
   const parsed = JSON.parse(contents);
   if (
     !parsed ||
     typeof parsed !== 'object' ||
     typeof parsed.schemaVersion !== 'number' ||
-    !parsed.motorcycle ||
+    !parsed.vehicle ||
     !Array.isArray(parsed.maintenanceRecords) ||
     !Array.isArray(parsed.ownershipEvents)
   ) {
     throw new Error('This file is not a valid Clank maintenance history export.');
   }
-  return parsed as MotorcycleTransferBundle;
+  return parsed as VehicleTransferBundle;
 }

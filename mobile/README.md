@@ -1,8 +1,8 @@
 # Clank (mobile)
 
-A local-first motorcycle maintenance log. Everything lives in an on-device SQLite database —
-there's no account and no server. When you sell a bike, you export its full history to a file and
-share it with the buyer, who imports it into their own copy of the app.
+A local-first vehicle maintenance log for cars and motorcycles. Everything lives in an on-device
+SQLite database — there's no account and no server. When you sell a vehicle, you export its full
+history to a file and share it with the buyer, who imports it into their own copy of the app.
 
 ## Stack
 
@@ -29,28 +29,32 @@ run by hand. Schema changes go in `src/db/schema.ts`, followed by `npx drizzle-k
 
 ## Project layout
 
-- `src/app/` — routes. `(tabs)/` holds the three tabs (Garage, Search, Settings); `motorcycle/`
-  holds the pushed screens (add, import, and per-bike `[id]/` detail, edit, and maintenance forms).
+- `src/app/` — routes. `(tabs)/` holds the three tabs (Garage, Search, Settings); `vehicle/`
+  holds the pushed screens (add, import, and per-vehicle `[id]/` detail, edit, and maintenance
+  forms).
 - `src/db/` — Drizzle schema, generated migrations, and the SQLite client.
 - `src/lib/transfer.ts` — builds and parses the export/import JSON bundle.
 - `src/lib/external-diagram-links.ts` — deep-links to OEM parts catalogs by make/model.
-- `src/components/` — shared UI (themed views/text, form fields, the migration gate).
+- `src/components/` — shared UI (themed views/text, form fields, the vehicle type picker, the
+  migration gate).
 
 ## Data model
 
-- `motorcycles` — one row per bike, with a `status` of `active` or `archived` (set when you mark a
-  bike as no longer yours).
-- `maintenanceRecords` — service history, one bike to many records.
+- `vehicles` — one row per car or motorcycle (`type` is `motorcycle` or `car`), with a `status` of
+  `active` or `archived` (set when you mark a vehicle as no longer yours).
+- `maintenanceRecords` — service/repair history, one vehicle to many records. Each entry has a
+  date, an optional time, a type (oil change, repair, etc.), an optional part number, mileage,
+  cost, who performed it, and a description.
 - `ownershipEvents` — a provenance log (`added` / `imported` / `transferred_out`) that travels with
-  the export bundle so a new owner's app can show the bike's full history, not just what happened
-  since they imported it.
-- `diagrams` — schema exists for per-bike uploaded files (wiring diagrams, manuals); not yet wired
-  up to a screen.
+  the export bundle so a new owner's app can show the vehicle's full history, not just what
+  happened since they imported it.
+- `diagrams` — schema exists for per-vehicle uploaded files (wiring diagrams, manuals); not yet
+  wired up to a screen.
 
 ## Export / import
 
-"Share history" on a motorcycle's detail screen snapshots that bike, its maintenance records, and
+"Share history" on a vehicle's detail screen snapshots that vehicle, its maintenance records, and
 its ownership events into a versioned JSON file and hands it to the OS share sheet. "Import" on the
-Garage tab reads a picked file, previews it, and inserts it as a new motorcycle with its history
-re-linked and an `imported` ownership event appended — no merging with existing bikes, no network
-involved.
+Garage tab reads a picked file, previews it, and inserts it as a new vehicle with its history
+re-linked and an `imported` ownership event appended — no merging with existing vehicles, no
+network involved.

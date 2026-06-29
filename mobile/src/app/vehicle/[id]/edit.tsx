@@ -1,22 +1,36 @@
-import { router } from 'expo-router';
+import { eq } from 'drizzle-orm';
+import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Stack } from 'expo-router/stack';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormField } from '@/components/form-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { type VehicleType, VehicleTypeField } from '@/components/vehicle-type-field';
 import { Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
-import { motorcycles, ownershipEvents } from '@/db/schema';
+import { vehicles } from '@/db/schema';
 
 function emptyToUndefined(value: string) {
   const trimmed = value.trim();
   return trimmed === '' ? undefined : trimmed;
 }
 
-export default function NewMotorcycleScreen() {
+export default function EditVehicleScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const vehicleId = Number(id);
+
+  const { data: vehicleRows } = useLiveQuery(
+    db.select().from(vehicles).where(eq(vehicles.id, vehicleId)),
+    [vehicleId],
+  );
+  const vehicle = vehicleRows[0];
+
+  const [loaded, setLoaded] = useState(false);
+  const [type, setType] = useState<VehicleType>('motorcycle');
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
@@ -27,6 +41,32 @@ export default function NewMotorcycleScreen() {
   const [mileage, setMileage] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (vehicle && !loaded) {
+      setType(vehicle.type);
+      setMake(vehicle.make);
+      setModel(vehicle.model);
+      setYear(String(vehicle.year));
+      setNickname(vehicle.nickname ?? '');
+      setVin(vehicle.vin ?? '');
+      setPlate(vehicle.plate ?? '');
+      setColor(vehicle.color ?? '');
+      setMileage(vehicle.mileage != null ? String(vehicle.mileage) : '');
+      setNotes(vehicle.notes ?? '');
+      setLoaded(true);
+    }
+  }, [vehicle, loaded]);
+
+  if (!vehicle) {
+    return (
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          <ThemedText themeColor="textSecondary">Vehicle not found.</ThemedText>
+        </SafeAreaView>
+      </ThemedView>
+    );
+  }
 
   const handleSave = () => {
     const parsedYear = Number(year);
@@ -41,9 +81,9 @@ export default function NewMotorcycleScreen() {
       return;
     }
 
-    const bike = db
-      .insert(motorcycles)
-      .values({
+    db.update(vehicles)
+      .set({
+        type,
         make: make.trim(),
         model: model.trim(),
         year: parsedYear,
@@ -53,22 +93,27 @@ export default function NewMotorcycleScreen() {
         color: emptyToUndefined(color),
         mileage: parsedMileage,
         notes: emptyToUndefined(notes),
+        updatedAt: new Date().toISOString(),
       })
-      .returning()
-      .get();
+      .where(eq(vehicles.id, vehicleId))
+      .run();
 
-    db.insert(ownershipEvents).values({ motorcycleId: bike.id, type: 'added' }).run();
-
-    router.replace(`/motorcycle/${bike.id}`);
+    router.back();
   };
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen options={{ title: 'Add motorcycle' }} />
+      <Stack.Screen options={{ title: 'Edit vehicle' }} />
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.form}>
+          <VehicleTypeField value={type} onChange={setType} />
           <FormField label="Make" value={make} onChangeText={setMake} placeholder="Honda" />
-          <FormField label="Model" value={model} onChangeText={setModel} placeholder="CB500F" />
+          <FormField
+            label="Model"
+            value={model}
+            onChangeText={setModel}
+            placeholder={type === 'car' ? 'Civic' : 'CB500F'}
+          />
           <FormField
             label="Year"
             value={year}

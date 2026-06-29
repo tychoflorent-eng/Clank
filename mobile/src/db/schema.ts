@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-export const motorcycles = sqliteTable('motorcycles', {
+export const vehicles = sqliteTable('vehicles', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  type: text('type', { enum: ['motorcycle', 'car'] }).notNull(),
   make: text('make').notNull(),
   model: text('model').notNull(),
   year: integer('year').notNull(),
@@ -12,7 +13,7 @@ export const motorcycles = sqliteTable('motorcycles', {
   color: text('color'),
   mileage: integer('mileage'),
   notes: text('notes'),
-  // 'archived' means this bike was transferred to a new owner but the log is kept for history.
+  // 'archived' means this vehicle was transferred to a new owner but the log is kept for history.
   status: text('status', { enum: ['active', 'archived'] })
     .notNull()
     .default('active'),
@@ -27,12 +28,14 @@ export const motorcycles = sqliteTable('motorcycles', {
 
 export const maintenanceRecords = sqliteTable('maintenance_records', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  motorcycleId: integer('motorcycle_id')
+  vehicleId: integer('vehicle_id')
     .notNull()
-    .references(() => motorcycles.id, { onDelete: 'cascade' }),
+    .references(() => vehicles.id, { onDelete: 'cascade' }),
   date: text('date').notNull(),
+  time: text('time'),
   mileage: integer('mileage'),
   type: text('type').notNull(),
+  partNumber: text('part_number'),
   description: text('description'),
   performedBy: text('performed_by'),
   cost: real('cost'),
@@ -43,9 +46,9 @@ export const maintenanceRecords = sqliteTable('maintenance_records', {
 
 export const diagrams = sqliteTable('diagrams', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  motorcycleId: integer('motorcycle_id')
+  vehicleId: integer('vehicle_id')
     .notNull()
-    .references(() => motorcycles.id, { onDelete: 'cascade' }),
+    .references(() => vehicles.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   fileName: text('file_name').notNull(),
   // Path relative to the app's document directory, e.g. "diagrams/<uuid>.png".
@@ -57,14 +60,14 @@ export const diagrams = sqliteTable('diagrams', {
     .default(sql`CURRENT_TIMESTAMP`),
 });
 
-// A provenance log for a bike's ownership chain. Since there are no accounts or a server,
-// this travels inside the export/transfer bundle so a new owner's app can show the bike's
+// A provenance log for a vehicle's ownership chain. Since there are no accounts or a server,
+// this travels inside the export/transfer bundle so a new owner's app can show the vehicle's
 // full history rather than just what happened since they imported it.
 export const ownershipEvents = sqliteTable('ownership_events', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  motorcycleId: integer('motorcycle_id')
+  vehicleId: integer('vehicle_id')
     .notNull()
-    .references(() => motorcycles.id, { onDelete: 'cascade' }),
+    .references(() => vehicles.id, { onDelete: 'cascade' }),
   type: text('type', { enum: ['added', 'imported', 'transferred_out'] }).notNull(),
   occurredAt: text('occurred_at')
     .notNull()

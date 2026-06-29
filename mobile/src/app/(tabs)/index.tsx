@@ -8,15 +8,15 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
-import { motorcycles } from '@/db/schema';
+import { vehicles } from '@/db/schema';
 
 export default function GarageScreen() {
-  const { data: bikes } = useLiveQuery(
+  const { data: items } = useLiveQuery(
     db
       .select()
-      .from(motorcycles)
-      .where(eq(motorcycles.status, 'active'))
-      .orderBy(desc(motorcycles.createdAt)),
+      .from(vehicles)
+      .where(eq(vehicles.status, 'active'))
+      .orderBy(desc(vehicles.createdAt)),
   );
 
   return (
@@ -28,14 +28,14 @@ export default function GarageScreen() {
           </ThemedText>
           <ThemedView style={styles.headerActions}>
             <Pressable
-              onPress={() => router.push('/motorcycle/import')}
+              onPress={() => router.push('/vehicle/import')}
               style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type="backgroundElement" style={styles.addButton}>
                 <ThemedText type="smallBold">Import</ThemedText>
               </ThemedView>
             </Pressable>
             <Pressable
-              onPress={() => router.push('/motorcycle/new')}
+              onPress={() => router.push('/vehicle/new')}
               style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type="backgroundElement" style={styles.addButton}>
                 <ThemedText type="smallBold">Add</ThemedText>
@@ -45,23 +45,28 @@ export default function GarageScreen() {
         </ThemedView>
 
         <FlatList
-          data={bikes}
+          data={items}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <ThemedText themeColor="textSecondary" style={styles.emptyText}>
-              No motorcycles yet. Add one to start a maintenance log, or import a bike someone
+              No vehicles yet. Add one to start a maintenance log, or import a vehicle someone
               shared with you.
             </ThemedText>
           }
           renderItem={({ item }) => (
             <Pressable
-              onPress={() => router.push(`/motorcycle/${item.id}`)}
+              onPress={() => router.push(`/vehicle/${item.id}`)}
               style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type="backgroundElement" style={styles.card}>
-                <ThemedText type="subtitle" style={styles.cardTitle}>
-                  {item.nickname || `${item.make} ${item.model}`}
-                </ThemedText>
+                <ThemedView style={styles.cardTitleRow}>
+                  <ThemedText type="subtitle" style={styles.cardTitle}>
+                    {item.nickname || `${item.make} ${item.model}`}
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {item.type === 'car' ? 'Car' : 'Motorcycle'}
+                  </ThemedText>
+                </ThemedView>
                 <ThemedText themeColor="textSecondary">
                   {item.year} {item.make} {item.model}
                   {item.mileage != null ? ` · ${item.mileage.toLocaleString()} mi` : ''}
@@ -106,6 +111,11 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: Spacing.three,
     gap: Spacing.half,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   cardTitle: { fontSize: 18, lineHeight: 24 },
 });
