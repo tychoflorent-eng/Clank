@@ -1,56 +1,56 @@
-# Welcome to your Expo app 👋
+# Clank (mobile)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A local-first motorcycle maintenance log. Everything lives in an on-device SQLite database —
+there's no account and no server. When you sell a bike, you export its full history to a file and
+share it with the buyer, who imports it into their own copy of the app.
 
-## Get started
+## Stack
 
-1. Install dependencies
+- [Expo](https://expo.dev) / React Native, with [Expo Router](https://docs.expo.dev/router/introduction/)
+  for file-based navigation (tabs + pushed detail/form screens via a root `Stack`).
+- [`expo-sqlite`](https://docs.expo.dev/versions/latest/sdk/sqlite/) + [Drizzle ORM](https://orm.drizzle.team/)
+  for the local database, with `useLiveQuery` keeping screens in sync with writes.
+- [`expo-file-system`](https://docs.expo.dev/versions/latest/sdk/filesystem/) +
+  [`expo-sharing`](https://docs.expo.dev/versions/latest/sdk/sharing/) for the export/import handoff.
 
-   ```bash
-   npm install
-   ```
+Targets are Android first, then iOS. Web (`expo start --web`) is useful for quickly checking layout,
+but isn't a shipping target — `expo-sqlite`'s web backend needs COOP/COEP headers the dev server
+doesn't set, so the database won't actually open in a browser.
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Getting started
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Migrations run automatically on launch (see `src/components/migration-gate.tsx`); there's nothing to
+run by hand. Schema changes go in `src/db/schema.ts`, followed by `npx drizzle-kit generate`.
 
-### Other setup steps
+## Project layout
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+- `src/app/` — routes. `(tabs)/` holds the three tabs (Garage, Search, Settings); `motorcycle/`
+  holds the pushed screens (add, import, and per-bike `[id]/` detail, edit, and maintenance forms).
+- `src/db/` — Drizzle schema, generated migrations, and the SQLite client.
+- `src/lib/transfer.ts` — builds and parses the export/import JSON bundle.
+- `src/lib/external-diagram-links.ts` — deep-links to OEM parts catalogs by make/model.
+- `src/components/` — shared UI (themed views/text, form fields, the migration gate).
 
-## Learn more
+## Data model
 
-To learn more about developing your project with Expo, look at the following resources:
+- `motorcycles` — one row per bike, with a `status` of `active` or `archived` (set when you mark a
+  bike as no longer yours).
+- `maintenanceRecords` — service history, one bike to many records.
+- `ownershipEvents` — a provenance log (`added` / `imported` / `transferred_out`) that travels with
+  the export bundle so a new owner's app can show the bike's full history, not just what happened
+  since they imported it.
+- `diagrams` — schema exists for per-bike uploaded files (wiring diagrams, manuals); not yet wired
+  up to a screen.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Export / import
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+"Share history" on a motorcycle's detail screen snapshots that bike, its maintenance records, and
+its ownership events into a versioned JSON file and hands it to the OS share sheet. "Import" on the
+Garage tab reads a picked file, previews it, and inserts it as a new motorcycle with its history
+re-linked and an `imported` ownership event appended — no merging with existing bikes, no network
+involved.

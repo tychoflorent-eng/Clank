@@ -4,8 +4,8 @@ A mobile motorcycle maintenance log. Track services, parts, and diagrams for the
 fully on-device, no account or server required. When you sell a bike, export its whole history
 and hand it to the buyer so the log carries on with the new owner.
 
-Currently in active development (React Native, Android first, iOS later). See `mobile/` once
-scaffolded.
+Currently in active development (React Native + Expo, Android first, iOS later). See `mobile/`
+for the app and its own README for setup and architecture details.
 
 ## Other things in this repo
 
