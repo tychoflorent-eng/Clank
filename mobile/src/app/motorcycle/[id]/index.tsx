@@ -2,7 +2,8 @@ import { desc, eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Stack } from 'expo-router/stack';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
+import * as Sharing from 'expo-sharing';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -10,6 +11,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
 import { maintenanceRecords, motorcycles, ownershipEvents } from '@/db/schema';
+import { buildTransferBundle, writeTransferFile } from '@/lib/transfer';
 
 export default function MotorcycleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -50,6 +52,23 @@ export default function MotorcycleDetailScreen() {
     router.back();
   };
 
+  const handleShare = async () => {
+    try {
+      const bundle = buildTransferBundle(motorcycleId);
+      const file = writeTransferFile(bundle);
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Sharing unavailable', 'This device cannot share files.');
+        return;
+      }
+      await Sharing.shareAsync(file.uri, {
+        mimeType: 'application/json',
+        dialogTitle: 'Share maintenance history',
+      });
+    } catch (err) {
+      Alert.alert('Could not export', err instanceof Error ? err.message : String(err));
+    }
+  };
+
   return (
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ title: bike.nickname || `${bike.make} ${bike.model}` }} />
@@ -78,6 +97,11 @@ export default function MotorcycleDetailScreen() {
                 style={({ pressed }) => pressed && styles.pressed}>
                 <ThemedView type="backgroundSelected" style={styles.actionButton}>
                   <ThemedText type="smallBold">Edit</ThemedText>
+                </ThemedView>
+              </Pressable>
+              <Pressable onPress={handleShare} style={({ pressed }) => pressed && styles.pressed}>
+                <ThemedView type="backgroundElement" style={styles.actionButton}>
+                  <ThemedText type="smallBold">Share history</ThemedText>
                 </ThemedView>
               </Pressable>
               <Pressable
@@ -140,6 +164,7 @@ const styles = StyleSheet.create({
   bikeTitle: { fontSize: 28, lineHeight: 34 },
   actionsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.two,
     marginTop: Spacing.three,
   },
