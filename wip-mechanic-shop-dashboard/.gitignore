@@ -1,0 +1,22 @@
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Local data: sqlite db + uploaded diagrams/manuals
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+data/diagrams/*
+!data/diagrams/.gitkeep
+
+# Env files with secrets (API keys)
+.env
+.env.local
+server/.env
+
+# Editor / OS
+.vscode/
+.DS_Store
+*.log
+npm-debug.log*

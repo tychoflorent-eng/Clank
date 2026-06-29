@@ -3,17 +3,17 @@ dist/
 build/
 *.tsbuildinfo
 
-# Local data: sqlite db + uploaded diagrams/manuals
-data/*.sqlite
-data/*.sqlite-shm
-data/*.sqlite-wal
-data/diagrams/*
-!data/diagrams/.gitkeep
+# Expo / React Native
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
 
-# Env files with secrets (API keys)
+# Env files with secrets
 .env
 .env.local
-server/.env
 
 # Editor / OS
 .vscode/

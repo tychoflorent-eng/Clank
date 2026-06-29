@@ -1,0 +1,20 @@
+{
+  "name": "clank-mechanic-shop-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "description": "W.I.P. self-hosted LAN dashboard for shops (paused in favor of the mobile-first app at the repo root)",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w client && npm run build -w server",
+    "start": "npm run start -w server",
+    "db:generate": "npm run db:generate -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "drizzle-orm": "^0.45.2"
+  }
+}
