@@ -34,17 +34,20 @@ run by hand. Schema changes go in `src/db/schema.ts`, followed by `npx drizzle-k
   forms).
 - `src/db/` — Drizzle schema, generated migrations, and the SQLite client.
 - `src/lib/transfer.ts` — builds and parses the export/import JSON bundle.
-- `src/lib/external-diagram-links.ts` — deep-links to OEM parts catalogs by make/model.
+- `src/lib/external-diagram-links.ts` — deep-links to parts catalogs by make/model, with different
+  sources for cars (RockAuto, CarParts.com, 7zap) and motorcycles (RevZilla, Partzilla, 7zap).
 - `src/components/` — shared UI (themed views/text, form fields, the vehicle type picker, the
   migration gate).
 
 ## Data model
 
 - `vehicles` — one row per car or motorcycle (`type` is `motorcycle` or `car`), with a `status` of
-  `active` or `archived` (set when you mark a vehicle as no longer yours).
+  `active` or `archived` (set when you mark a vehicle as no longer yours; archived vehicles show
+  under "Past vehicles" in the Garage and can be restored).
 - `maintenanceRecords` — service/repair history, one vehicle to many records. Each entry has a
   date, an optional time, a type (oil change, repair, etc.), an optional part number, mileage,
-  cost, who performed it, and a description.
+  cost, who performed it, and a description. Records can be edited or deleted by tapping them in
+  the log.
 - `ownershipEvents` — a provenance log (`added` / `imported` / `transferred_out`) that travels with
   the export bundle so a new owner's app can show the vehicle's full history, not just what
   happened since they imported it.

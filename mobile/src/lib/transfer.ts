@@ -113,15 +113,29 @@ export function writeTransferFile(bundle: VehicleTransferBundle): File {
 
 export function parseTransferBundle(contents: string): VehicleTransferBundle {
   const parsed = JSON.parse(contents);
+  if (!parsed || typeof parsed !== 'object' || typeof parsed.schemaVersion !== 'number') {
+    throw new Error('This file is not a valid Clank maintenance history export.');
+  }
+
+  // v1 bundles predate the vehicle generalization: the vehicle lived under a
+  // `motorcycle` key and had no type. Records from that era also lack the
+  // time/partNumber fields, which the nullable columns absorb on insert.
+  if (!parsed.vehicle && parsed.motorcycle && typeof parsed.motorcycle === 'object') {
+    parsed.vehicle = { type: 'motorcycle', ...parsed.motorcycle };
+  }
+
   if (
-    !parsed ||
-    typeof parsed !== 'object' ||
-    typeof parsed.schemaVersion !== 'number' ||
     !parsed.vehicle ||
+    typeof parsed.vehicle !== 'object' ||
     !Array.isArray(parsed.maintenanceRecords) ||
     !Array.isArray(parsed.ownershipEvents)
   ) {
     throw new Error('This file is not a valid Clank maintenance history export.');
   }
+
+  if (parsed.vehicle.type !== 'car' && parsed.vehicle.type !== 'motorcycle') {
+    parsed.vehicle.type = 'motorcycle';
+  }
+
   return parsed as VehicleTransferBundle;
 }

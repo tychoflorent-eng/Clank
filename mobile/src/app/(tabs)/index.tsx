@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { router } from 'expo-router';
 import { FlatList, Platform, Pressable, StyleSheet } from 'react-native';
@@ -10,14 +10,40 @@ import { BottomTabInset, Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
 import { vehicles } from '@/db/schema';
 
+type Vehicle = typeof vehicles.$inferSelect;
+
+function VehicleCard({ vehicle, archived }: { vehicle: Vehicle; archived?: boolean }) {
+  return (
+    <Pressable
+      onPress={() => router.push(`/vehicle/${vehicle.id}`)}
+      style={({ pressed }) => pressed && styles.pressed}>
+      <ThemedView
+        type="backgroundElement"
+        style={[styles.card, archived && styles.archivedCard]}>
+        <ThemedView style={styles.cardTitleRow}>
+          <ThemedText type="subtitle" style={styles.cardTitle}>
+            {vehicle.nickname || `${vehicle.make} ${vehicle.model}`}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {vehicle.type === 'car' ? 'Car' : 'Motorcycle'}
+          </ThemedText>
+        </ThemedView>
+        <ThemedText themeColor="textSecondary">
+          {vehicle.year} {vehicle.make} {vehicle.model}
+          {vehicle.mileage != null ? ` · ${vehicle.mileage.toLocaleString()} mi` : ''}
+        </ThemedText>
+      </ThemedView>
+    </Pressable>
+  );
+}
+
 export default function GarageScreen() {
   const { data: items } = useLiveQuery(
-    db
-      .select()
-      .from(vehicles)
-      .where(eq(vehicles.status, 'active'))
-      .orderBy(desc(vehicles.createdAt)),
+    db.select().from(vehicles).orderBy(desc(vehicles.createdAt)),
   );
+
+  const active = items.filter((vehicle) => vehicle.status === 'active');
+  const archived = items.filter((vehicle) => vehicle.status === 'archived');
 
   return (
     <ThemedView style={styles.container}>
@@ -45,7 +71,7 @@ export default function GarageScreen() {
         </ThemedView>
 
         <FlatList
-          data={items}
+          data={active}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           ListEmptyComponent={
@@ -54,26 +80,19 @@ export default function GarageScreen() {
               shared with you.
             </ThemedText>
           }
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => router.push(`/vehicle/${item.id}`)}
-              style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.card}>
-                <ThemedView style={styles.cardTitleRow}>
-                  <ThemedText type="subtitle" style={styles.cardTitle}>
-                    {item.nickname || `${item.make} ${item.model}`}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {item.type === 'car' ? 'Car' : 'Motorcycle'}
-                  </ThemedText>
-                </ThemedView>
-                <ThemedText themeColor="textSecondary">
-                  {item.year} {item.make} {item.model}
-                  {item.mileage != null ? ` · ${item.mileage.toLocaleString()} mi` : ''}
+          renderItem={({ item }) => <VehicleCard vehicle={item} />}
+          ListFooterComponent={
+            archived.length > 0 ? (
+              <ThemedView style={styles.pastSection}>
+                <ThemedText type="subtitle" style={styles.pastTitle}>
+                  Past vehicles
                 </ThemedText>
+                {archived.map((vehicle) => (
+                  <VehicleCard key={vehicle.id} vehicle={vehicle} archived />
+                ))}
               </ThemedView>
-            </Pressable>
-          )}
+            ) : null
+          }
         />
       </SafeAreaView>
     </ThemedView>
@@ -112,10 +131,16 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     gap: Spacing.half,
   },
+  archivedCard: { opacity: 0.6 },
   cardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   cardTitle: { fontSize: 18, lineHeight: 24 },
+  pastSection: {
+    gap: Spacing.two,
+    marginTop: Spacing.four,
+  },
+  pastTitle: { fontSize: 22, lineHeight: 28 },
 });

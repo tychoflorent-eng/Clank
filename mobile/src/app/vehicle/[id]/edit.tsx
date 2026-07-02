@@ -3,7 +3,7 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormField } from '@/components/form-field';
@@ -23,7 +23,7 @@ export default function EditVehicleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const vehicleId = Number(id);
 
-  const { data: vehicleRows } = useLiveQuery(
+  const { data: vehicleRows, updatedAt } = useLiveQuery(
     db.select().from(vehicles).where(eq(vehicles.id, vehicleId)),
     [vehicleId],
   );
@@ -59,6 +59,10 @@ export default function EditVehicleScreen() {
   }, [vehicle, loaded]);
 
   if (!vehicle) {
+    // Live query still loading — don't flash "not found".
+    if (updatedAt === undefined) {
+      return <ThemedView style={styles.container} />;
+    }
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
@@ -99,6 +103,24 @@ export default function EditVehicleScreen() {
       .run();
 
     router.back();
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete this vehicle?',
+      'Its maintenance log and history are permanently deleted. If you sold it, use "No longer own this vehicle" instead to keep the history.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            db.delete(vehicles).where(eq(vehicles.id, vehicleId)).run();
+            router.dismissAll();
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -158,6 +180,12 @@ export default function EditVehicleScreen() {
               <ThemedText type="smallBold">Save</ThemedText>
             </ThemedView>
           </Pressable>
+
+          <Pressable onPress={handleDelete} style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedView type="backgroundElement" style={styles.deleteButton}>
+              <ThemedText type="smallBold">Delete vehicle</ThemedText>
+            </ThemedView>
+          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -177,5 +205,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
     borderRadius: Spacing.three,
     marginTop: Spacing.two,
+  },
+  deleteButton: {
+    alignItems: 'center',
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.three,
   },
 });

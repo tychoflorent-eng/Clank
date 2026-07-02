@@ -17,7 +17,7 @@ export default function VehicleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const vehicleId = Number(id);
 
-  const { data: vehicleRows } = useLiveQuery(
+  const { data: vehicleRows, updatedAt } = useLiveQuery(
     db.select().from(vehicles).where(eq(vehicles.id, vehicleId)),
     [vehicleId],
   );
@@ -28,11 +28,20 @@ export default function VehicleDetailScreen() {
       .select()
       .from(maintenanceRecords)
       .where(eq(maintenanceRecords.vehicleId, vehicleId))
-      .orderBy(desc(maintenanceRecords.date)),
+      .orderBy(
+        desc(maintenanceRecords.date),
+        desc(maintenanceRecords.time),
+        desc(maintenanceRecords.id),
+      ),
     [vehicleId],
   );
 
   if (!vehicle) {
+    // The live query hasn't produced its first result yet — don't flash
+    // "not found" while the row is still loading.
+    if (updatedAt === undefined) {
+      return <ThemedView style={styles.container} />;
+    }
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
@@ -42,14 +51,37 @@ export default function VehicleDetailScreen() {
     );
   }
 
+  const isArchived = vehicle.status === 'archived';
+  const totalCost = records.reduce((sum, record) => sum + (record.cost ?? 0), 0);
+
   const handleTransferOut = () => {
-    const now = new Date().toISOString();
+    Alert.alert(
+      'No longer own this vehicle?',
+      'It will move to Past vehicles in your garage. Its history is kept and you can still share or restore it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Move to past vehicles',
+          style: 'destructive',
+          onPress: () => {
+            const now = new Date().toISOString();
+            db.update(vehicles)
+              .set({ status: 'archived', archivedAt: now, updatedAt: now })
+              .where(eq(vehicles.id, vehicleId))
+              .run();
+            db.insert(ownershipEvents).values({ vehicleId, type: 'transferred_out' }).run();
+            router.back();
+          },
+        },
+      ],
+    );
+  };
+
+  const handleRestore = () => {
     db.update(vehicles)
-      .set({ status: 'archived', archivedAt: now, updatedAt: now })
+      .set({ status: 'active', archivedAt: null, updatedAt: new Date().toISOString() })
       .where(eq(vehicles.id, vehicleId))
       .run();
-    db.insert(ownershipEvents).values({ vehicleId, type: 'transferred_out' }).run();
-    router.back();
   };
 
   const handleShare = async () => {
@@ -69,6 +101,13 @@ export default function VehicleDetailScreen() {
     }
   };
 
+  const handleFindParts = () => {
+    router.push({
+      pathname: '/(tabs)/model-search',
+      params: { make: vehicle.make, model: vehicle.model, type: vehicle.type },
+    });
+  };
+
   return (
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ title: vehicle.nickname || `${vehicle.make} ${vehicle.model}` }} />
@@ -84,6 +123,11 @@ export default function VehicleDetailScreen() {
                   {vehicle.type === 'car' ? 'Car' : 'Motorcycle'}
                 </ThemedText>
               </ThemedView>
+              {isArchived && (
+                <ThemedView type="backgroundElement" style={styles.typeBadge}>
+                  <ThemedText type="small">Transferred out</ThemedText>
+                </ThemedView>
+              )}
             </ThemedView>
             <ThemedText themeColor="textSecondary">
               {vehicle.year} {vehicle.make} {vehicle.model}
@@ -103,11 +147,20 @@ export default function VehicleDetailScreen() {
             {vehicle.notes && <ThemedText themeColor="textSecondary">{vehicle.notes}</ThemedText>}
 
             <ThemedView style={styles.actionsRow}>
+              {!isArchived && (
+                <Pressable
+                  onPress={() => router.push(`/vehicle/${vehicleId}/edit`)}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedView type="backgroundSelected" style={styles.actionButton}>
+                    <ThemedText type="smallBold">Edit</ThemedText>
+                  </ThemedView>
+                </Pressable>
+              )}
               <Pressable
-                onPress={() => router.push(`/vehicle/${vehicleId}/edit`)}
+                onPress={handleFindParts}
                 style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedView type="backgroundSelected" style={styles.actionButton}>
-                  <ThemedText type="smallBold">Edit</ThemedText>
+                <ThemedView type="backgroundElement" style={styles.actionButton}>
+                  <ThemedText type="smallBold">Find parts</ThemedText>
                 </ThemedView>
               </Pressable>
               <Pressable onPress={handleShare} style={({ pressed }) => pressed && styles.pressed}>
@@ -115,13 +168,23 @@ export default function VehicleDetailScreen() {
                   <ThemedText type="smallBold">Share history</ThemedText>
                 </ThemedView>
               </Pressable>
-              <Pressable
-                onPress={handleTransferOut}
-                style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedView type="backgroundElement" style={styles.actionButton}>
-                  <ThemedText type="smallBold">No longer own this vehicle</ThemedText>
-                </ThemedView>
-              </Pressable>
+              {isArchived ? (
+                <Pressable
+                  onPress={handleRestore}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedView type="backgroundElement" style={styles.actionButton}>
+                    <ThemedText type="smallBold">Return to garage</ThemedText>
+                  </ThemedView>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={handleTransferOut}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedView type="backgroundElement" style={styles.actionButton}>
+                    <ThemedText type="smallBold">No longer own this vehicle</ThemedText>
+                  </ThemedView>
+                </Pressable>
+              )}
             </ThemedView>
           </ThemedView>
 
@@ -130,35 +193,47 @@ export default function VehicleDetailScreen() {
               <ThemedText type="subtitle" style={styles.sectionTitle}>
                 Maintenance log
               </ThemedText>
-              <Pressable
-                onPress={() => router.push(`/vehicle/${vehicleId}/maintenance/new`)}
-                style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedView type="backgroundElement" style={styles.addButton}>
-                  <ThemedText type="smallBold">Add</ThemedText>
-                </ThemedView>
-              </Pressable>
+              {!isArchived && (
+                <Pressable
+                  onPress={() => router.push(`/vehicle/${vehicleId}/maintenance/new`)}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedView type="backgroundElement" style={styles.addButton}>
+                    <ThemedText type="smallBold">Add</ThemedText>
+                  </ThemedView>
+                </Pressable>
+              )}
             </ThemedView>
 
-            {records.length === 0 && (
+            {records.length === 0 ? (
               <ThemedText themeColor="textSecondary">No maintenance records yet.</ThemedText>
+            ) : (
+              <ThemedText themeColor="textSecondary">
+                {records.length} record{records.length === 1 ? '' : 's'}
+                {totalCost > 0 ? ` · $${totalCost.toFixed(2)} total` : ''}
+              </ThemedText>
             )}
 
             {records.map((record) => (
-              <ThemedView key={record.id} type="backgroundElement" style={styles.recordCard}>
-                <ThemedText type="smallBold">{record.type}</ThemedText>
-                <ThemedText themeColor="textSecondary">
-                  {record.date}
-                  {record.time ? ` ${record.time}` : ''}
-                  {record.mileage != null ? ` · ${record.mileage.toLocaleString()} mi` : ''}
-                  {record.cost != null ? ` · $${record.cost.toFixed(2)}` : ''}
-                </ThemedText>
-                {record.partNumber && (
-                  <ThemedText themeColor="textSecondary">Part #: {record.partNumber}</ThemedText>
-                )}
-                {record.description && (
-                  <ThemedText themeColor="textSecondary">{record.description}</ThemedText>
-                )}
-              </ThemedView>
+              <Pressable
+                key={record.id}
+                onPress={() => router.push(`/vehicle/${vehicleId}/maintenance/${record.id}`)}
+                style={({ pressed }) => pressed && styles.pressed}>
+                <ThemedView type="backgroundElement" style={styles.recordCard}>
+                  <ThemedText type="smallBold">{record.type}</ThemedText>
+                  <ThemedText themeColor="textSecondary">
+                    {record.date}
+                    {record.time ? ` ${record.time}` : ''}
+                    {record.mileage != null ? ` · ${record.mileage.toLocaleString()} mi` : ''}
+                    {record.cost != null ? ` · $${record.cost.toFixed(2)}` : ''}
+                  </ThemedText>
+                  {record.partNumber && (
+                    <ThemedText themeColor="textSecondary">Part #: {record.partNumber}</ThemedText>
+                  )}
+                  {record.description && (
+                    <ThemedText themeColor="textSecondary">{record.description}</ThemedText>
+                  )}
+                </ThemedView>
+              </Pressable>
             ))}
           </ThemedView>
         </ScrollView>
@@ -179,6 +254,7 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: Spacing.two,
   },
   vehicleTitle: { fontSize: 28, lineHeight: 34 },

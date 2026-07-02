@@ -25,7 +25,7 @@ export function VehicleTypeField({ value, onChange }: VehicleTypeFieldProps) {
           <Pressable
             key={option.value}
             onPress={() => onChange(option.value)}
-            style={styles.option}>
+            style={({ pressed }) => [styles.option, pressed && styles.pressed]}>
             <ThemedView
               type={value === option.value ? 'backgroundSelected' : 'backgroundElement'}
               style={styles.optionInner}>
@@ -42,6 +42,7 @@ const styles = StyleSheet.create({
   field: { gap: Spacing.one },
   row: { flexDirection: 'row', gap: Spacing.two },
   option: { flex: 1 },
+  pressed: { opacity: 0.7 },
   optionInner: {
     alignItems: 'center',
     paddingVertical: Spacing.two,

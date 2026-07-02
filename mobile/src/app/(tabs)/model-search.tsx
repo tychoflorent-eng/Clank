@@ -1,25 +1,43 @@
 import * as Linking from 'expo-linking';
-import { useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { FlatList, Platform, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormField } from '@/components/form-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { type VehicleType, VehicleTypeField } from '@/components/vehicle-type-field';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { buildExternalDiagramLinks, type ExternalDiagramLink } from '@/lib/external-diagram-links';
 
 export default function ModelSearchScreen() {
+  const params = useLocalSearchParams<{ make?: string; model?: string; type?: string }>();
+
+  const [type, setType] = useState<VehicleType>('motorcycle');
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [links, setLinks] = useState<ExternalDiagramLink[] | null>(null);
+
+  // "Find parts" on a vehicle screen lands here with the vehicle prefilled.
+  useEffect(() => {
+    if (typeof params.make === 'string' && params.make.trim()) {
+      const nextType: VehicleType = params.type === 'car' ? 'car' : 'motorcycle';
+      const nextMake = params.make.trim();
+      const nextModel = typeof params.model === 'string' ? params.model.trim() : '';
+      setType(nextType);
+      setMake(nextMake);
+      setModel(nextModel);
+      setLinks(buildExternalDiagramLinks(nextMake, nextModel, nextType));
+    }
+  }, [params.make, params.model, params.type]);
 
   const handleSearch = () => {
     if (!make.trim()) {
       setLinks(null);
       return;
     }
-    setLinks(buildExternalDiagramLinks(make.trim(), model.trim()));
+    setLinks(buildExternalDiagramLinks(make.trim(), model.trim(), type));
   };
 
   return (
@@ -33,6 +51,7 @@ export default function ModelSearchScreen() {
         </ThemedText>
 
         <ThemedView style={styles.form}>
+          <VehicleTypeField value={type} onChange={setType} />
           <FormField label="Make" value={make} onChangeText={setMake} placeholder="Honda" />
           <FormField
             label="Model"
