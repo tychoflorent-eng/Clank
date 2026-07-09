@@ -1,7 +1,8 @@
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { File } from 'expo-file-system';
 import { router } from 'expo-router';
 import { Stack } from 'expo-router/stack';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,19 +11,52 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
 import { maintenanceRecords, ownershipEvents, vehicles } from '@/db/schema';
+import { decodeTransferQr } from '@/lib/qr-transfer';
 import { parseTransferBundle, type VehicleTransferBundle } from '@/lib/transfer';
 
 export default function ImportVehicleScreen() {
   const [bundle, setBundle] = useState<VehicleTransferBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  // onBarcodeScanned keeps firing every frame; only handle the first hit.
+  const handledScanRef = useRef(false);
+
+  const [permission, requestPermission] = useCameraPermissions();
 
   const handleChooseFile = async () => {
     setError(null);
+    setScanning(false);
     try {
       const picked = await File.pickFileAsync({ mimeTypes: ['application/json', '*/*'] });
       if (picked.canceled) return;
       const contents = await picked.result.text();
       setBundle(parseTransferBundle(contents));
+    } catch (err) {
+      setBundle(null);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleStartScan = async () => {
+    setError(null);
+    if (!permission?.granted) {
+      const response = await requestPermission();
+      if (!response.granted) {
+        setError('Camera permission is needed to scan a QR code.');
+        return;
+      }
+    }
+    handledScanRef.current = false;
+    setBundle(null);
+    setScanning(true);
+  };
+
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (handledScanRef.current) return;
+    handledScanRef.current = true;
+    setScanning(false);
+    try {
+      setBundle(decodeTransferQr(data));
     } catch (err) {
       setBundle(null);
       setError(err instanceof Error ? err.message : String(err));
@@ -85,15 +119,39 @@ export default function ImportVehicleScreen() {
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <ThemedText themeColor="textSecondary">
-            Choose a maintenance history file someone shared with you to add their vehicle to
-            your garage with its full history.
+            Scan the QR code on the previous owner&apos;s phone, or choose a maintenance history
+            file they shared with you, to add their vehicle to your garage with its full history.
           </ThemedText>
 
-          <Pressable onPress={handleChooseFile} style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedView type="backgroundElement" style={styles.chooseButton}>
-              <ThemedText type="smallBold">Choose file</ThemedText>
-            </ThemedView>
-          </Pressable>
+          <ThemedView style={styles.buttonRow}>
+            <Pressable
+              onPress={scanning ? () => setScanning(false) : handleStartScan}
+              style={({ pressed }) => [styles.buttonRowItem, pressed && styles.pressed]}>
+              <ThemedView
+                type={scanning ? 'backgroundSelected' : 'backgroundElement'}
+                style={styles.chooseButton}>
+                <ThemedText type="smallBold">
+                  {scanning ? 'Stop scanning' : 'Scan QR code'}
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
+            <Pressable
+              onPress={handleChooseFile}
+              style={({ pressed }) => [styles.buttonRowItem, pressed && styles.pressed]}>
+              <ThemedView type="backgroundElement" style={styles.chooseButton}>
+                <ThemedText type="smallBold">Choose file</ThemedText>
+              </ThemedView>
+            </Pressable>
+          </ThemedView>
+
+          {scanning && (
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={handleBarcodeScanned}
+            />
+          )}
 
           {error && <ThemedText themeColor="textSecondary">{error}</ThemedText>}
 
@@ -133,10 +191,20 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   pressed: { opacity: 0.7 },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  buttonRowItem: { flex: 1 },
   chooseButton: {
     alignItems: 'center',
     paddingVertical: Spacing.three,
     borderRadius: Spacing.three,
+  },
+  camera: {
+    height: 320,
+    borderRadius: Spacing.three,
+    overflow: 'hidden',
   },
   previewCard: {
     padding: Spacing.three,

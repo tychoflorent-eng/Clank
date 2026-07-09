@@ -9,10 +9,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { TransferQrModal } from '@/components/transfer-qr-modal';
 import { Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
 import { maintenanceRecords, ownershipEvents, vehicles } from '@/db/schema';
 import { parseTasks } from '@/lib/maintenance-tasks';
+import { encodeTransferQr } from '@/lib/qr-transfer';
 import { buildTransferBundle, writeTransferFile } from '@/lib/transfer';
 
 export default function VehicleDetailScreen() {
@@ -20,6 +22,8 @@ export default function VehicleDetailScreen() {
   const vehicleId = Number(id);
 
   const [taskFilter, setTaskFilter] = useState<string | null>(null);
+  const [qrVisible, setQrVisible] = useState(false);
+  const [qrPayload, setQrPayload] = useState<string | null>(null);
 
   const { data: vehicleRows, updatedAt } = useLiveQuery(
     db.select().from(vehicles).where(eq(vehicles.id, vehicleId)),
@@ -134,6 +138,15 @@ export default function VehicleDetailScreen() {
     void shareHistory();
   };
 
+  const handleShowQr = () => {
+    try {
+      setQrPayload(encodeTransferQr(buildTransferBundle(vehicleId)));
+      setQrVisible(true);
+    } catch (err) {
+      Alert.alert('Could not export', err instanceof Error ? err.message : String(err));
+    }
+  };
+
   const handleFindParts = () => {
     router.push({
       pathname: '/(tabs)/model-search',
@@ -199,6 +212,11 @@ export default function VehicleDetailScreen() {
               <Pressable onPress={handleShare} style={({ pressed }) => pressed && styles.pressed}>
                 <ThemedView type="backgroundElement" style={styles.actionButton}>
                   <ThemedText type="smallBold">Share history</ThemedText>
+                </ThemedView>
+              </Pressable>
+              <Pressable onPress={handleShowQr} style={({ pressed }) => pressed && styles.pressed}>
+                <ThemedView type="backgroundElement" style={styles.actionButton}>
+                  <ThemedText type="smallBold">QR transfer</ThemedText>
                 </ThemedView>
               </Pressable>
               {isArchived ? (
@@ -325,6 +343,13 @@ export default function VehicleDetailScreen() {
           </ThemedView>
         </ScrollView>
       </SafeAreaView>
+
+      <TransferQrModal
+        visible={qrVisible}
+        onClose={() => setQrVisible(false)}
+        payload={qrPayload}
+        vehicleName={vehicle.nickname || `${vehicle.make} ${vehicle.model}`}
+      />
     </ThemedView>
   );
 }

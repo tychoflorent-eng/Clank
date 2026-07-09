@@ -60,7 +60,9 @@ run by hand. Schema changes go in `src/db/schema.ts`, followed by `npx drizzle-k
 "Share history" on a vehicle's detail screen snapshots that vehicle, its maintenance records, and
 its ownership events into a versioned JSON file and hands it to the OS share sheet. "No longer own
 this vehicle" offers the same export inline ("Send file & move") so handing the history to the
-buyer and archiving happen in one step. "Import" on the Garage tab reads a picked file, previews
+buyer and archiving happen in one step. "QR transfer" shows the same bundle as a QR code
+(LZ-compressed, `CLANK1:` prefix — see `src/lib/qr-transfer.ts`) that the buyer scans from
+Import, no file handoff needed; histories too large for a QR fall back to the file flow. "Import" on the Garage tab reads a picked file, previews
 it, and inserts it as a new vehicle with its history re-linked and an `imported` ownership event
 appended — no merging with existing vehicles, no network involved. Older exports (v1 motorcycle
 bundles, v2 bundles without tasks) still import cleanly.
