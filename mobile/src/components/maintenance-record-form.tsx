@@ -36,6 +36,9 @@ type MaintenanceRecordFormProps = {
   };
   submitLabel: string;
   onSubmit: (values: MaintenanceRecordFormValues) => void;
+  // Rendered between the description field and the save button; the screens
+  // own media picking/persistence since new records have no id until saved.
+  mediaSection?: ReactNode;
   footer?: ReactNode;
 };
 
@@ -56,6 +59,7 @@ export function MaintenanceRecordForm({
   initial,
   submitLabel,
   onSubmit,
+  mediaSection,
   footer,
 }: MaintenanceRecordFormProps) {
   const [date, setDate] = useState(initial?.date ?? todayIso());
@@ -156,6 +160,8 @@ export function MaintenanceRecordForm({
         multiline
         numberOfLines={4}
       />
+
+      {mediaSection}
 
       {error && <ThemedText themeColor="textSecondary">{error}</ThemedText>}
 

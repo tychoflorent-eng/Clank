@@ -49,6 +49,9 @@ run by hand. Schema changes go in `src/db/schema.ts`, followed by `npx drizzle-k
   changes — stored as a JSON array in `tasks`), a free-text type, an optional part number,
   mileage, cost, who performed it, and a description. Records can be edited or deleted by tapping
   them in the log, and the log can be filtered by task/type to see when something was last done.
+- `mediaAttachments` — photos and videos attached to a maintenance record. Files live under
+  `media/` in the app's document directory; images are resized to ≤1600px JPEG on attach, videos
+  are stored as picked (no transcoder available in Expo Go).
 - `ownershipEvents` — a provenance log (`added` / `imported` / `transferred_out`) that travels with
   the export bundle so a new owner's app can show the vehicle's full history, not just what
   happened since they imported it.
@@ -57,12 +60,15 @@ run by hand. Schema changes go in `src/db/schema.ts`, followed by `npx drizzle-k
 
 ## Export / import
 
-"Share history" on a vehicle's detail screen snapshots that vehicle, its maintenance records, and
-its ownership events into a versioned JSON file and hands it to the OS share sheet. "No longer own
+"Share history" on a vehicle's detail screen snapshots that vehicle, its maintenance records,
+their photos/videos, and its ownership events into a zip (`bundle.json` + `media/*`, built with
+fflate; media entries are stored uncompressed since JPEG/H.264 don't re-compress) and hands it to
+the OS share sheet. "No longer own
 this vehicle" offers the same export inline ("Send file & move") so handing the history to the
 buyer and archiving happen in one step. "QR transfer" shows the same bundle as a QR code
 (LZ-compressed, `CLANK1:` prefix — see `src/lib/qr-transfer.ts`) that the buyer scans from
 Import, no file handoff needed; histories too large for a QR fall back to the file flow. "Import" on the Garage tab reads a picked file, previews
 it, and inserts it as a new vehicle with its history re-linked and an `imported` ownership event
 appended — no merging with existing vehicles, no network involved. Older exports (v1 motorcycle
-bundles, v2 bundles without tasks) still import cleanly.
+bundles, v2/v3 plain-JSON files) still import cleanly; QR transfers carry everything except
+photos/videos, which only travel in the file export.

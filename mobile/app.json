@@ -32,6 +32,13 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Clank lets you attach photos and videos from your library to maintenance records.",
+          "cameraPermission": "Clank lets you take photos of repairs to attach to maintenance records."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",

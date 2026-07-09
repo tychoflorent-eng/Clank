@@ -11,7 +11,17 @@ const QR_PREFIX = 'CLANK1:';
 const MAX_QR_PAYLOAD = 2600;
 
 export function encodeTransferQr(bundle: VehicleTransferBundle): string | null {
-  const payload = QR_PREFIX + LZString.compressToEncodedURIComponent(JSON.stringify(bundle));
+  // Photos/videos can't ride along in a QR code — strip them so the buyer
+  // doesn't end up with records pointing at files that never arrived.
+  const withoutMedia: VehicleTransferBundle = {
+    ...bundle,
+    maintenanceRecords: bundle.maintenanceRecords.map((record) => ({
+      ...record,
+      media: null,
+    })),
+  };
+  const payload =
+    QR_PREFIX + LZString.compressToEncodedURIComponent(JSON.stringify(withoutMedia));
   return payload.length > MAX_QR_PAYLOAD ? null : payload;
 }
 

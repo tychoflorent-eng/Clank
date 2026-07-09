@@ -46,6 +46,21 @@ export const maintenanceRecords = sqliteTable('maintenance_records', {
     .default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const mediaAttachments = sqliteTable('media_attachments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  recordId: integer('record_id')
+    .notNull()
+    .references(() => maintenanceRecords.id, { onDelete: 'cascade' }),
+  kind: text('kind', { enum: ['image', 'video'] }).notNull(),
+  // Path relative to the app document directory, e.g. "media/1720000000-ab12cd34.jpg".
+  filePath: text('file_path').notNull(),
+  mimeType: text('mime_type').notNull(),
+  fileSize: integer('file_size').notNull(),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const diagrams = sqliteTable('diagrams', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   vehicleId: integer('vehicle_id')

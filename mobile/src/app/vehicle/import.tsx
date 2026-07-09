@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { File } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import { useRef, useState } from 'react';
@@ -10,12 +10,15 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
-import { maintenanceRecords, ownershipEvents, vehicles } from '@/db/schema';
+import { maintenanceRecords, mediaAttachments, ownershipEvents, vehicles } from '@/db/schema';
+import { MEDIA_DIR_NAME } from '@/lib/media';
 import { decodeTransferQr } from '@/lib/qr-transfer';
-import { parseTransferBundle, type VehicleTransferBundle } from '@/lib/transfer';
+import { parseTransferFile, type VehicleTransferBundle } from '@/lib/transfer';
 
 export default function ImportVehicleScreen() {
   const [bundle, setBundle] = useState<VehicleTransferBundle | null>(null);
+  // Media bytes from a zip export, keyed by bundlePath; kept until import.
+  const mediaFilesRef = useRef<Map<string, Uint8Array>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   // onBarcodeScanned keeps firing every frame; only handle the first hit.
@@ -27,12 +30,16 @@ export default function ImportVehicleScreen() {
     setError(null);
     setScanning(false);
     try {
-      const picked = await File.pickFileAsync({ mimeTypes: ['application/json', '*/*'] });
+      const picked = await File.pickFileAsync({
+        mimeTypes: ['application/json', 'application/zip', '*/*'],
+      });
       if (picked.canceled) return;
-      const contents = await picked.result.text();
-      setBundle(parseTransferBundle(contents));
+      const parsed = parseTransferFile(await picked.result.bytes());
+      mediaFilesRef.current = parsed.mediaFiles;
+      setBundle(parsed.bundle);
     } catch (err) {
       setBundle(null);
+      mediaFilesRef.current = new Map();
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -57,6 +64,7 @@ export default function ImportVehicleScreen() {
     setScanning(false);
     try {
       setBundle(decodeTransferQr(data));
+      mediaFilesRef.current = new Map();
     } catch (err) {
       setBundle(null);
       setError(err instanceof Error ? err.message : String(err));
@@ -65,6 +73,25 @@ export default function ImportVehicleScreen() {
 
   const handleImport = () => {
     if (!bundle) return;
+
+    // Write media files out first so the DB rows only ever point at files
+    // that exist; on failure, orphaned files are harmless.
+    const mediaDir = new Directory(Paths.document, MEDIA_DIR_NAME);
+    const writtenByBundlePath = new Map<string, { filePath: string; fileSize: number }>();
+    if (mediaFilesRef.current.size > 0) {
+      mediaDir.create({ intermediates: true, idempotent: true });
+      for (const [bundlePath, bytes] of mediaFilesRef.current) {
+        const extension = bundlePath.slice(bundlePath.lastIndexOf('.'));
+        const name = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extension}`;
+        const target = new File(mediaDir, name);
+        target.create();
+        target.write(bytes);
+        writtenByBundlePath.set(bundlePath, {
+          filePath: `${MEDIA_DIR_NAME}/${name}`,
+          fileSize: bytes.byteLength,
+        });
+      }
+    }
 
     const vehicle = db.transaction((tx) => {
       const inserted = tx
@@ -86,9 +113,11 @@ export default function ImportVehicleScreen() {
         .get();
 
       for (const record of bundle.maintenanceRecords) {
-        tx.insert(maintenanceRecords)
+        const { media, ...recordFields } = record;
+        const insertedRecord = tx
+          .insert(maintenanceRecords)
           .values({
-            ...record,
+            ...recordFields,
             vehicleId: inserted.id,
             // The bundle carries tasks as an array; the column stores JSON text.
             tasks:
@@ -96,7 +125,22 @@ export default function ImportVehicleScreen() {
                 ? JSON.stringify(record.tasks)
                 : null,
           })
-          .run();
+          .returning()
+          .get();
+
+        for (const item of media ?? []) {
+          const written = writtenByBundlePath.get(item.bundlePath);
+          if (!written) continue; // QR imports and hand-trimmed zips
+          tx.insert(mediaAttachments)
+            .values({
+              recordId: insertedRecord.id,
+              kind: item.kind === 'video' ? 'video' : 'image',
+              filePath: written.filePath,
+              mimeType: item.mimeType,
+              fileSize: written.fileSize,
+            })
+            .run();
+        }
       }
 
       for (const event of bundle.ownershipEvents) {
@@ -166,6 +210,11 @@ export default function ImportVehicleScreen() {
               <ThemedText themeColor="textSecondary">
                 {bundle.maintenanceRecords.length} maintenance record
                 {bundle.maintenanceRecords.length === 1 ? '' : 's'}
+                {mediaFilesRef.current.size > 0
+                  ? ` · ${mediaFilesRef.current.size} photo/video file${
+                      mediaFilesRef.current.size === 1 ? '' : 's'
+                    }`
+                  : ''}
               </ThemedText>
 
               <Pressable

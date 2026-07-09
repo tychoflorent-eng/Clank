@@ -11,9 +11,17 @@ type TransferQrModalProps = {
   // null means the history was too large to fit in a QR code.
   payload: string | null;
   vehicleName: string;
+  // True when the history has photos/videos, which a QR cannot carry.
+  hasMedia?: boolean;
 };
 
-export function TransferQrModal({ visible, onClose, payload, vehicleName }: TransferQrModalProps) {
+export function TransferQrModal({
+  visible,
+  onClose,
+  payload,
+  vehicleName,
+  hasMedia,
+}: TransferQrModalProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
@@ -32,6 +40,12 @@ export function TransferQrModal({ visible, onClose, payload, vehicleName }: Tran
                 Have the new owner open Clank, tap Import in their Garage, and scan this code to
                 receive the full maintenance history.
               </ThemedText>
+              {hasMedia && (
+                <ThemedText themeColor="textSecondary" style={styles.hint}>
+                  Photos and videos don&apos;t fit in a QR code — use &quot;Share history&quot; to
+                  send them as a file.
+                </ThemedText>
+              )}
             </>
           ) : (
             <ThemedText themeColor="textSecondary" style={styles.hint}>

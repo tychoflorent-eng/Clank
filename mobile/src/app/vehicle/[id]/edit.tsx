@@ -13,6 +13,7 @@ import { type VehicleType, VehicleTypeField } from '@/components/vehicle-type-fi
 import { Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
 import { vehicles } from '@/db/schema';
+import { deleteAttachmentFilesForVehicle } from '@/lib/media';
 
 function emptyToUndefined(value: string) {
   const trimmed = value.trim();
@@ -115,6 +116,8 @@ export default function EditVehicleScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
+            // Files first: the DB rows cascade with the delete, the files don't.
+            deleteAttachmentFilesForVehicle(vehicleId);
             db.delete(vehicles).where(eq(vehicles.id, vehicleId)).run();
             router.dismissAll();
           },

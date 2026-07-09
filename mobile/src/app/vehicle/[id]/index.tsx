@@ -7,15 +7,18 @@ import { useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Image } from 'expo-image';
+
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TransferQrModal } from '@/components/transfer-qr-modal';
 import { Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
-import { maintenanceRecords, ownershipEvents, vehicles } from '@/db/schema';
+import { maintenanceRecords, mediaAttachments, ownershipEvents, vehicles } from '@/db/schema';
 import { parseTasks } from '@/lib/maintenance-tasks';
+import { mediaUri } from '@/lib/media';
 import { encodeTransferQr } from '@/lib/qr-transfer';
-import { buildTransferBundle, writeTransferFile } from '@/lib/transfer';
+import { buildTransferBundle, buildTransferExport, writeTransferFile } from '@/lib/transfer';
 
 export default function VehicleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,6 +27,7 @@ export default function VehicleDetailScreen() {
   const [taskFilter, setTaskFilter] = useState<string | null>(null);
   const [qrVisible, setQrVisible] = useState(false);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
+  const [qrHasMedia, setQrHasMedia] = useState(false);
 
   const { data: vehicleRows, updatedAt } = useLiveQuery(
     db.select().from(vehicles).where(eq(vehicles.id, vehicleId)),
@@ -41,6 +45,20 @@ export default function VehicleDetailScreen() {
         desc(maintenanceRecords.time),
         desc(maintenanceRecords.id),
       ),
+    [vehicleId],
+  );
+
+  const { data: attachmentRows } = useLiveQuery(
+    db
+      .select({
+        id: mediaAttachments.id,
+        recordId: mediaAttachments.recordId,
+        kind: mediaAttachments.kind,
+        filePath: mediaAttachments.filePath,
+      })
+      .from(mediaAttachments)
+      .innerJoin(maintenanceRecords, eq(mediaAttachments.recordId, maintenanceRecords.id))
+      .where(eq(maintenanceRecords.vehicleId, vehicleId)),
     [vehicleId],
   );
 
@@ -117,14 +135,14 @@ export default function VehicleDetailScreen() {
 
   const shareHistory = async (): Promise<boolean> => {
     try {
-      const bundle = buildTransferBundle(vehicleId);
-      const file = writeTransferFile(bundle);
+      const transferExport = buildTransferExport(vehicleId);
+      const file = await writeTransferFile(transferExport);
       if (!(await Sharing.isAvailableAsync())) {
         Alert.alert('Sharing unavailable', 'This device cannot share files.');
         return false;
       }
       await Sharing.shareAsync(file.uri, {
-        mimeType: 'application/json',
+        mimeType: 'application/zip',
         dialogTitle: 'Share maintenance history',
       });
       return true;
@@ -140,7 +158,11 @@ export default function VehicleDetailScreen() {
 
   const handleShowQr = () => {
     try {
-      setQrPayload(encodeTransferQr(buildTransferBundle(vehicleId)));
+      const bundle = buildTransferBundle(vehicleId);
+      setQrHasMedia(
+        bundle.maintenanceRecords.some((record) => record.media && record.media.length > 0),
+      );
+      setQrPayload(encodeTransferQr(bundle));
       setQrVisible(true);
     } catch (err) {
       Alert.alert('Could not export', err instanceof Error ? err.message : String(err));
@@ -308,6 +330,9 @@ export default function VehicleDetailScreen() {
 
             {filteredRecords.map((record) => {
               const recordTasks = parseTasks(record.tasks);
+              const recordMedia = attachmentRows.filter(
+                (attachment) => attachment.recordId === record.id,
+              );
               return (
                 <Pressable
                   key={record.id}
@@ -336,6 +361,31 @@ export default function VehicleDetailScreen() {
                     {record.description && (
                       <ThemedText themeColor="textSecondary">{record.description}</ThemedText>
                     )}
+                    {recordMedia.length > 0 && (
+                      <ThemedView style={styles.mediaRow}>
+                        {recordMedia.slice(0, 4).map((attachment) =>
+                          attachment.kind === 'image' ? (
+                            <Image
+                              key={attachment.id}
+                              source={{ uri: mediaUri(attachment.filePath) }}
+                              style={styles.mediaThumb}
+                              contentFit="cover"
+                            />
+                          ) : (
+                            <ThemedView key={attachment.id} style={styles.videoThumb}>
+                              <ThemedText type="small" style={styles.videoThumbLabel}>
+                                ▶
+                              </ThemedText>
+                            </ThemedView>
+                          ),
+                        )}
+                        {recordMedia.length > 4 && (
+                          <ThemedText type="small" themeColor="textSecondary">
+                            +{recordMedia.length - 4}
+                          </ThemedText>
+                        )}
+                      </ThemedView>
+                    )}
                   </ThemedView>
                 </Pressable>
               );
@@ -349,6 +399,7 @@ export default function VehicleDetailScreen() {
         onClose={() => setQrVisible(false)}
         payload={qrPayload}
         vehicleName={vehicle.nickname || `${vehicle.make} ${vehicle.model}`}
+        hasMedia={qrHasMedia}
       />
     </ThemedView>
   );
@@ -413,4 +464,25 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     gap: Spacing.half,
   },
+  mediaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    marginTop: Spacing.one,
+    backgroundColor: 'transparent',
+  },
+  mediaThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: Spacing.one,
+  },
+  videoThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: Spacing.one,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1c1c1e',
+  },
+  videoThumbLabel: { color: '#fff' },
 });
