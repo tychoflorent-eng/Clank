@@ -27,6 +27,8 @@ npx expo start
 Migrations run automatically on launch (see `src/components/migration-gate.tsx`); there's nothing to
 run by hand. Schema changes go in `src/db/schema.ts`, followed by `npx drizzle-kit generate`.
 
+To build a real Android APK/AAB (dev build, sideload, or Play Store), see [BUILDING.md](./BUILDING.md).
+
 ## Project layout
 
 - `src/app/` — routes. `(tabs)/` holds the three tabs (Garage, Search, Settings); `vehicle/`

@@ -8,9 +8,12 @@
     "scheme": "clank",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.tychoflorent.clank"
     },
     "android": {
+      "package": "com.tychoflorent.clank",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -28,14 +31,17 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Clank uses the camera to scan a QR code when receiving a vehicle's maintenance history."
+          "cameraPermission": "Clank uses the camera to scan a QR code when receiving a vehicle's maintenance history.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [
         "expo-image-picker",
         {
           "photosPermission": "Clank lets you attach photos and videos from your library to maintenance records.",
-          "cameraPermission": "Clank lets you take photos of repairs to attach to maintenance records."
+          "cameraPermission": "Clank lets you take photos of repairs to attach to maintenance records.",
+          "microphonePermission": false
         }
       ],
       [
