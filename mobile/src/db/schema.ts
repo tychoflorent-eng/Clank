@@ -35,6 +35,8 @@ export const maintenanceRecords = sqliteTable('maintenance_records', {
   time: text('time'),
   mileage: integer('mileage'),
   type: text('type').notNull(),
+  // JSON string array of quick-pick tasks, e.g. '["Oil change","Tire rotation"]'.
+  tasks: text('tasks'),
   partNumber: text('part_number'),
   description: text('description'),
   performedBy: text('performed_by'),

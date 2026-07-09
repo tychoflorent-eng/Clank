@@ -71,6 +71,7 @@ export default function EditMaintenanceRecordScreen() {
             date: record.date,
             time: record.time ?? '',
             type: record.type,
+            tasks: record.tasks ?? '',
             partNumber: record.partNumber ?? '',
             mileage: record.mileage != null ? String(record.mileage) : '',
             cost: record.cost != null ? String(record.cost) : '',

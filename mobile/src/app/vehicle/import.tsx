@@ -53,7 +53,15 @@ export default function ImportVehicleScreen() {
 
       for (const record of bundle.maintenanceRecords) {
         tx.insert(maintenanceRecords)
-          .values({ vehicleId: inserted.id, ...record })
+          .values({
+            ...record,
+            vehicleId: inserted.id,
+            // The bundle carries tasks as an array; the column stores JSON text.
+            tasks:
+              Array.isArray(record.tasks) && record.tasks.length > 0
+                ? JSON.stringify(record.tasks)
+                : null,
+          })
           .run();
       }
 

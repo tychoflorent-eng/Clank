@@ -45,9 +45,10 @@ run by hand. Schema changes go in `src/db/schema.ts`, followed by `npx drizzle-k
   `active` or `archived` (set when you mark a vehicle as no longer yours; archived vehicles show
   under "Past vehicles" in the Garage and can be restored).
 - `maintenanceRecords` — service/repair history, one vehicle to many records. Each entry has a
-  date, an optional time, a type (oil change, repair, etc.), an optional part number, mileage,
-  cost, who performed it, and a description. Records can be edited or deleted by tapping them in
-  the log.
+  date, an optional time, quick-pick common tasks (oil change, tire pressure/rotation, fluid
+  changes — stored as a JSON array in `tasks`), a free-text type, an optional part number,
+  mileage, cost, who performed it, and a description. Records can be edited or deleted by tapping
+  them in the log, and the log can be filtered by task/type to see when something was last done.
 - `ownershipEvents` — a provenance log (`added` / `imported` / `transferred_out`) that travels with
   the export bundle so a new owner's app can show the vehicle's full history, not just what
   happened since they imported it.
@@ -57,7 +58,9 @@ run by hand. Schema changes go in `src/db/schema.ts`, followed by `npx drizzle-k
 ## Export / import
 
 "Share history" on a vehicle's detail screen snapshots that vehicle, its maintenance records, and
-its ownership events into a versioned JSON file and hands it to the OS share sheet. "Import" on the
-Garage tab reads a picked file, previews it, and inserts it as a new vehicle with its history
-re-linked and an `imported` ownership event appended — no merging with existing vehicles, no
-network involved.
+its ownership events into a versioned JSON file and hands it to the OS share sheet. "No longer own
+this vehicle" offers the same export inline ("Send file & move") so handing the history to the
+buyer and archiving happen in one step. "Import" on the Garage tab reads a picked file, previews
+it, and inserts it as a new vehicle with its history re-linked and an `imported` ownership event
+appended — no merging with existing vehicles, no network involved. Older exports (v1 motorcycle
+bundles, v2 bundles without tasks) still import cleanly.

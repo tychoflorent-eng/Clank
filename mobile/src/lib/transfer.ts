@@ -3,8 +3,9 @@ import { File, Paths } from 'expo-file-system';
 
 import { db } from '@/db/client';
 import { maintenanceRecords, ownershipEvents, vehicles } from '@/db/schema';
+import { parseTasks } from '@/lib/maintenance-tasks';
 
-export const TRANSFER_SCHEMA_VERSION = 2;
+export const TRANSFER_SCHEMA_VERSION = 3;
 
 export type VehicleTransferBundle = {
   schemaVersion: number;
@@ -27,6 +28,8 @@ export type VehicleTransferBundle = {
     time: string | null;
     mileage: number | null;
     type: string;
+    // Exported as a plain array for readability; stored as a JSON string column.
+    tasks: string[] | null;
     partNumber: string | null;
     description: string | null;
     performedBy: string | null;
@@ -79,6 +82,7 @@ export function buildTransferBundle(vehicleId: number): VehicleTransferBundle {
       time: record.time,
       mileage: record.mileage,
       type: record.type,
+      tasks: record.tasks ? parseTasks(record.tasks) : null,
       partNumber: record.partNumber,
       description: record.description,
       performedBy: record.performedBy,

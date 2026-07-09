@@ -1,3 +1,14 @@
+-- Dev installs from the pre-vehicle (motorcycle-era) schema never had this
+-- migration recorded, so it runs on top of their old tables. Clear those out
+-- first; children before `motorcycles` so cascading FKs don't object.
+DROP TABLE IF EXISTS `maintenance_records`;
+--> statement-breakpoint
+DROP TABLE IF EXISTS `diagrams`;
+--> statement-breakpoint
+DROP TABLE IF EXISTS `ownership_events`;
+--> statement-breakpoint
+DROP TABLE IF EXISTS `motorcycles`;
+--> statement-breakpoint
 CREATE TABLE `diagrams` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`vehicle_id` integer NOT NULL,

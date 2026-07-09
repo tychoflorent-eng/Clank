@@ -2,9 +2,11 @@ import { type ReactNode, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { FormField } from '@/components/form-field';
+import { TaskChecklist } from '@/components/task-checklist';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { COMMON_TASKS, parseTasks, serializeTasks } from '@/lib/maintenance-tasks';
 
 // Optional fields are null (not undefined) when cleared so that updates
 // actually null the column out instead of being skipped by drizzle's set().
@@ -12,6 +14,7 @@ export type MaintenanceRecordFormValues = {
   date: string;
   time: string | null;
   type: string;
+  tasks: string | null;
   partNumber: string | null;
   mileage: number | null;
   cost: number | null;
@@ -24,6 +27,7 @@ type MaintenanceRecordFormProps = {
     date: string;
     time: string;
     type: string;
+    tasks: string;
     partNumber: string;
     mileage: string;
     cost: string;
@@ -56,6 +60,7 @@ export function MaintenanceRecordForm({
 }: MaintenanceRecordFormProps) {
   const [date, setDate] = useState(initial?.date ?? todayIso());
   const [time, setTime] = useState(initial?.time ?? nowTime());
+  const [tasks, setTasks] = useState<string[]>(() => parseTasks(initial?.tasks));
   const [type, setType] = useState(initial?.type ?? '');
   const [partNumber, setPartNumber] = useState(initial?.partNumber ?? '');
   const [mileage, setMileage] = useState(initial?.mileage ?? '');
@@ -64,9 +69,15 @@ export function MaintenanceRecordForm({
   const [description, setDescription] = useState(initial?.description ?? '');
   const [error, setError] = useState<string | null>(null);
 
+  const handleToggleTask = (task: string) => {
+    setTasks((prev) =>
+      prev.includes(task) ? prev.filter((item) => item !== task) : [...prev, task],
+    );
+  };
+
   const handleSave = () => {
-    if (!date.trim() || !type.trim()) {
-      setError('Date and type are required.');
+    if (!date.trim() || (!type.trim() && tasks.length === 0)) {
+      setError('A date plus a type or at least one task are required.');
       return;
     }
 
@@ -91,6 +102,7 @@ export function MaintenanceRecordForm({
       date: date.trim(),
       time: emptyToNull(time),
       type: type.trim(),
+      tasks: serializeTasks(tasks),
       partNumber: emptyToNull(partNumber),
       mileage: parsedMileage,
       cost: parsedCost,
@@ -103,11 +115,12 @@ export function MaintenanceRecordForm({
     <ScrollView contentContainerStyle={styles.form}>
       <FormField label="Date" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
       <FormField label="Time" value={time} onChangeText={setTime} placeholder="HH:MM" />
+      <TaskChecklist options={COMMON_TASKS} selected={tasks} onToggle={handleToggleTask} />
       <FormField
         label="Type"
         value={type}
         onChangeText={setType}
-        placeholder="Oil change, repair, etc."
+        placeholder="Repair, inspection, etc. (optional with tasks)"
       />
       <FormField
         label="Part number"

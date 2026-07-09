@@ -3,6 +3,7 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import * as Sharing from 'expo-sharing';
+import { useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,11 +12,14 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { db } from '@/db/client';
 import { maintenanceRecords, ownershipEvents, vehicles } from '@/db/schema';
+import { parseTasks } from '@/lib/maintenance-tasks';
 import { buildTransferBundle, writeTransferFile } from '@/lib/transfer';
 
 export default function VehicleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const vehicleId = Number(id);
+
+  const [taskFilter, setTaskFilter] = useState<string | null>(null);
 
   const { data: vehicleRows, updatedAt } = useLiveQuery(
     db.select().from(vehicles).where(eq(vehicles.id, vehicleId)),
@@ -52,25 +56,48 @@ export default function VehicleDetailScreen() {
   }
 
   const isArchived = vehicle.status === 'archived';
-  const totalCost = records.reduce((sum, record) => sum + (record.cost ?? 0), 0);
+
+  // Records are sorted newest-first, so the first filtered match is the most
+  // recent time that task was done.
+  const filterOptions = Array.from(
+    new Set(
+      records.flatMap((record) => [
+        ...parseTasks(record.tasks),
+        ...(record.type ? [record.type] : []),
+      ]),
+    ),
+  ).sort();
+  const filteredRecords = taskFilter
+    ? records.filter(
+        (record) => parseTasks(record.tasks).includes(taskFilter) || record.type === taskFilter,
+      )
+    : records;
+  const lastDone = taskFilter ? filteredRecords[0] : undefined;
+  const totalCost = filteredRecords.reduce((sum, record) => sum + (record.cost ?? 0), 0);
+
+  const archiveVehicle = () => {
+    const now = new Date().toISOString();
+    db.update(vehicles)
+      .set({ status: 'archived', archivedAt: now, updatedAt: now })
+      .where(eq(vehicles.id, vehicleId))
+      .run();
+    db.insert(ownershipEvents).values({ vehicleId, type: 'transferred_out' }).run();
+    router.back();
+  };
 
   const handleTransferOut = () => {
     Alert.alert(
       'No longer own this vehicle?',
-      'It will move to Past vehicles in your garage. Its history is kept and you can still share or restore it.',
+      'It will move to Past vehicles and its history is kept. You can send the history file to the new owner now — they import it in their own Clank to keep the log going.',
       [
         { text: 'Cancel', style: 'cancel' },
+        { text: 'Move only', onPress: archiveVehicle },
         {
-          text: 'Move to past vehicles',
-          style: 'destructive',
-          onPress: () => {
-            const now = new Date().toISOString();
-            db.update(vehicles)
-              .set({ status: 'archived', archivedAt: now, updatedAt: now })
-              .where(eq(vehicles.id, vehicleId))
-              .run();
-            db.insert(ownershipEvents).values({ vehicleId, type: 'transferred_out' }).run();
-            router.back();
+          text: 'Send file & move',
+          onPress: async () => {
+            if (await shareHistory()) {
+              archiveVehicle();
+            }
           },
         },
       ],
@@ -84,21 +111,27 @@ export default function VehicleDetailScreen() {
       .run();
   };
 
-  const handleShare = async () => {
+  const shareHistory = async (): Promise<boolean> => {
     try {
       const bundle = buildTransferBundle(vehicleId);
       const file = writeTransferFile(bundle);
       if (!(await Sharing.isAvailableAsync())) {
         Alert.alert('Sharing unavailable', 'This device cannot share files.');
-        return;
+        return false;
       }
       await Sharing.shareAsync(file.uri, {
         mimeType: 'application/json',
         dialogTitle: 'Share maintenance history',
       });
+      return true;
     } catch (err) {
       Alert.alert('Could not export', err instanceof Error ? err.message : String(err));
+      return false;
     }
+  };
+
+  const handleShare = () => {
+    void shareHistory();
   };
 
   const handleFindParts = () => {
@@ -204,37 +237,91 @@ export default function VehicleDetailScreen() {
               )}
             </ThemedView>
 
+            {filterOptions.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterRow}>
+                <Pressable
+                  onPress={() => setTaskFilter(null)}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedView
+                    type={taskFilter === null ? 'backgroundSelected' : 'backgroundElement'}
+                    style={styles.filterChip}>
+                    <ThemedText type="small">All</ThemedText>
+                  </ThemedView>
+                </Pressable>
+                {filterOptions.map((option) => (
+                  <Pressable
+                    key={option}
+                    onPress={() => setTaskFilter(taskFilter === option ? null : option)}
+                    style={({ pressed }) => pressed && styles.pressed}>
+                    <ThemedView
+                      type={taskFilter === option ? 'backgroundSelected' : 'backgroundElement'}
+                      style={styles.filterChip}>
+                      <ThemedText type="small">{option}</ThemedText>
+                    </ThemedView>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+
+            {taskFilter &&
+              (lastDone ? (
+                <ThemedText themeColor="textSecondary">
+                  Last done: {lastDone.date}
+                  {lastDone.time ? ` ${lastDone.time}` : ''}
+                  {lastDone.mileage != null
+                    ? ` · ${lastDone.mileage.toLocaleString()} mi`
+                    : ''}
+                </ThemedText>
+              ) : (
+                <ThemedText themeColor="textSecondary">Never logged.</ThemedText>
+              ))}
+
             {records.length === 0 ? (
               <ThemedText themeColor="textSecondary">No maintenance records yet.</ThemedText>
             ) : (
               <ThemedText themeColor="textSecondary">
-                {records.length} record{records.length === 1 ? '' : 's'}
+                {filteredRecords.length} record{filteredRecords.length === 1 ? '' : 's'}
                 {totalCost > 0 ? ` · $${totalCost.toFixed(2)} total` : ''}
               </ThemedText>
             )}
 
-            {records.map((record) => (
-              <Pressable
-                key={record.id}
-                onPress={() => router.push(`/vehicle/${vehicleId}/maintenance/${record.id}`)}
-                style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedView type="backgroundElement" style={styles.recordCard}>
-                  <ThemedText type="smallBold">{record.type}</ThemedText>
-                  <ThemedText themeColor="textSecondary">
-                    {record.date}
-                    {record.time ? ` ${record.time}` : ''}
-                    {record.mileage != null ? ` · ${record.mileage.toLocaleString()} mi` : ''}
-                    {record.cost != null ? ` · $${record.cost.toFixed(2)}` : ''}
-                  </ThemedText>
-                  {record.partNumber && (
-                    <ThemedText themeColor="textSecondary">Part #: {record.partNumber}</ThemedText>
-                  )}
-                  {record.description && (
-                    <ThemedText themeColor="textSecondary">{record.description}</ThemedText>
-                  )}
-                </ThemedView>
-              </Pressable>
-            ))}
+            {filteredRecords.map((record) => {
+              const recordTasks = parseTasks(record.tasks);
+              return (
+                <Pressable
+                  key={record.id}
+                  onPress={() => router.push(`/vehicle/${vehicleId}/maintenance/${record.id}`)}
+                  style={({ pressed }) => pressed && styles.pressed}>
+                  <ThemedView type="backgroundElement" style={styles.recordCard}>
+                    <ThemedText type="smallBold">
+                      {record.type || recordTasks.join(', ')}
+                    </ThemedText>
+                    {record.type !== '' && recordTasks.length > 0 && (
+                      <ThemedText themeColor="textSecondary">
+                        Tasks: {recordTasks.join(', ')}
+                      </ThemedText>
+                    )}
+                    <ThemedText themeColor="textSecondary">
+                      {record.date}
+                      {record.time ? ` ${record.time}` : ''}
+                      {record.mileage != null ? ` · ${record.mileage.toLocaleString()} mi` : ''}
+                      {record.cost != null ? ` · $${record.cost.toFixed(2)}` : ''}
+                    </ThemedText>
+                    {record.partNumber && (
+                      <ThemedText themeColor="textSecondary">
+                        Part #: {record.partNumber}
+                      </ThemedText>
+                    )}
+                    {record.description && (
+                      <ThemedText themeColor="textSecondary">{record.description}</ThemedText>
+                    )}
+                  </ThemedView>
+                </Pressable>
+              );
+            })}
           </ThemedView>
         </ScrollView>
       </SafeAreaView>
@@ -282,6 +369,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: { fontSize: 22, lineHeight: 28 },
+  filterRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  filterChip: {
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Spacing.two,
+  },
   addButton: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
